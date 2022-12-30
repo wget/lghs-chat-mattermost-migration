@@ -1,5 +1,4 @@
-# Rocket Chat
-
+# Rocket.Chat
 
 ## Situation initiale
 
@@ -104,7 +103,7 @@ Pour que les autres membres du LgHS puissent y accéder, voici les étapes de cr
    ![](img/doc-rocket-chat-scaleway-machine-creation-0021.png)
 26. Le LgHs dispose de plusieurs noms de domaines. Les sous-domaines placés sur `lghs.be` désignent les URLs que les utilisateurs finaux devront taper pour accéder au service, là où les domaines sur `lghs.space` concernent les domaines techniques. Créons ici un sous-domaine technique. Pour ce faire, choisissez `lghs.space`.
    ![](img/doc-rocket-chat-scaleway-machine-creation-0022.png)
-27. Assurez-vous que le bon domaine ait été sélectionné (1); choisissez le menu `DNS` (2); le sous-menu `Records` (3) devrait alors se sélectionner automatiquement; cliquez sur le bouton `Add record` (4), sélectionnez le type `AAAA` (5), spécifiez un sous-domaine (ici `chat-migration`) (6); spécifiez l'IPv6 que vous avez copiée précédemment à partir du panneau de résumé chez Scaleway (7); désactivez Cloudflare en proxy de l'adresse IP (8); et cliquez sur le bouton `Save`. Réitérez l'opération pour l'adresse IPv4 précédemment copiée (même procédure, changez juste le type en `A`).
+27. Assurez-vous que le bon domaine ait été sélectionné (1); choisissez le menu `DNS` (2); le sous-menu `Records` (3) devrait alors se sélectionner automatiquement; cliquez sur le bouton `Add record` (4), sélectionnez le type `AAAA` (5), spécifiez un sous-domaine (ici `lghs-chat-prod`) (6); spécifiez l'IPv6 que vous avez copiée précédemment à partir du panneau de résumé chez Scaleway (7); désactivez Cloudflare en proxy de l'adresse IP (8); et cliquez sur le bouton `Save`. Réitérez l'opération pour l'adresse IPv4 précédemment copiée (même procédure, changez juste le type en `A`).
    ![](img/doc-rocket-chat-scaleway-machine-creation-0023.png)
 
 ## Connexion à la machine
@@ -264,7 +263,7 @@ Le fait que le service Rocket.Chat soit commenté est tout à fait voulu. Ceci e
 
 ## Transfert des données
 
-Connectez-vous sur `chat-migration` et assurez-vous que la connexion par mot de passe soit autorisée et que la machine dispose bien d'un mot de passe sur le compte root :
+Connectez-vous sur `lghs-chat-prod` et assurez-vous que la connexion par mot de passe soit autorisée et que la machine dispose bien d'un mot de passe sur le compte root :
 ```
 /etc/ssh/sshd_config
 ```
@@ -304,17 +303,17 @@ $ mongodump
 [...]
 2022-12-17T06:22:46.957+0100    [####....................]  rocketchat.rocketchat_uploads.chunks  2366/11555  (20.5%)
 ```
-Transférer le dossier sur `chat-migration` (< 1 min de transfert):
+Transférer le dossier sur `lghs-chat-prod` (< 1 min de transfert):
 ```
-rsync -av --info=progress2 dump root@chat-migration.lghs.space:/srv/chat.lghs.be/dump-2022-12-17
-```
-
-
-```
-sshfs lghs-chat-migration:/srv/chat.lghs.be/ ./chat-migration/
+rsync -av --info=progress2 dump root@lghs-chat-prod.lghs.space:/srv/chat.lghs.be/dump-2022-12-17
 ```
 
-Se connecter sur `chat-migration`.
+
+```
+sshfs lghs-lghs-chat-prod:/srv/chat.lghs.be/ ./lghs-chat-prod/
+```
+
+Se connecter sur `lghs-chat-prod`.
 
 
 docker compose -f docker-compose-prod-3.0.12.yml up -d
@@ -528,7 +527,7 @@ En cliquant sur le bouton de test pour générer une notification sur les périp
 En regardant dans les logs, on a vu la raison :
 
 ```
-root@chat-migration:/srv/chat.lghs.be# docker logs -f chatlghsbe-rocketchat-1
+root@lghs-chat-prod:/srv/chat.lghs.be# docker logs -f chatlghsbe-rocketchat-1
 [...]
 Push ➔ info gateway rejected push notification. not retrying. {                                                                                                                             
   statusCode: 422,                                                                                                                                                                          
