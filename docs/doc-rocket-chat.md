@@ -415,21 +415,135 @@ $MONGO_OPLOG_URL must be set to the 'local' database of a Mongo replica set
 [...]
 ```
 
+Par défaut, le conteneur Docker et sa recette Compose sont configurés pour écouter sur le port 3000 et exporter ce port sur l'hôte. Si vous visitez `https://lghs-chat-prod.lghs.space:3000`, vous devriez tomber sur un Rocket.Chat 3.0.12 fonctionnel. Vous ne pourrez toutefois pas vous y connecter à cause du fait que Keycloack n'est pas configuré pour fonctionner sur l'URI `https://lghs-chat-prod.lghs.space:3000`.
 
+## Configuration d'un reverse-proxy HTTP
 
+Placez la configuration NGINX suivante dans `/etc/nginx/sites-available/rocketchat.conf` ([src.](https://docs.rocket.chat/quick-start/environment-configuration/configuring-ssl-reverse-proxy))
+ :
+```
+upstream backend {
+    server 127.0.0.1:3000;
+}
 
-https://docs.rocket.chat/quick-start/environment-configuration/configuring-ssl-reverse-proxy
+server {
+    listen 80;
+    listen [::]:80;
 
+    server_name chat.lghs.be;
 
+    return 301 https://$server_name$request_uri;
+}
 
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name chat.lghs.be;
+
+    # You can increase the limit if your need to.
+    client_max_body_size 200M;
+
+    error_log /var/log/nginx/rocketchat.access.log;
+
+    ssl_certificate /etc/letsencrypt/live/chat.lghs.be/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/chat.lghs.be/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers TLS13-AES-256-GCM-SHA384:TLS13-CHACHA20-POLY1305-SHA256:TLS_AES_256_GCM_SHA384:TLS-AES-256-GCM-SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS-CHACHA20-POLY1305-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES256-SHA;
+    ssl_prefer_server_ciphers on;
+
+    ssl_ecdh_curve secp521r1:secp384r1;
+    ssl_session_cache shared:SSL:50m;
+    ssl_session_timeout 1d;
+    # HSTS (ngx_http_headers_module is required) (15768000 seconds = 6 months)
+    add_header Strict-Transport-Security max-age=15768000;
+    # OCSP Stapling ---
+    # fetch OCSP records from URL in ssl_certificate and cache them
+    ssl_stapling on;
+    ssl_stapling_verify on;
+
+    location / {
+        proxy_pass http://backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $http_host;
+
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Nginx-Proxy true;
+
+        proxy_redirect off;
+    }
+}
+```
+
+Avant de démarrer NGINX, générons un certificat TLS avec LetsEncrypt en utilisant la méthode DNS-01. Cette méthode est bien pratique pour éviter d'utiliser un webroot sans devoir trouer nos règles de firewalling.
+
+Générons ensuite une clé d'API sur Cloudflare spécifique à la zone `lghs.be` pour permettre à Certbot de créer les enregistrements DNS nécessaires. Pour ce faire,
+
+1. Allez sur la page Cloudflare relatives aux jetons (`https://dash.cloudflare.com/profile/api-tokens`) et cliquez sur le bouton `Create Token`.
+   ![](img/doc-rocket-chat-cloudflare-dns-01-0001.png)
+2. On ne veut pas se baser sur un modèle existant, descendez dans le bas de la page et cliquez sur `Get started`
+   ![](img/doc-rocket-chat-cloudflare-dns-01-0002.png)
+3. Spéfifiez un nom évocateur pour le jeton, ici `chat.lghs.be acme DNS-01` :
+   ![](img/doc-rocket-chat-cloudflare-dns-01-0003.png)
+4. Pour ce qui est des permissions, cliquez sur le menu déroulant `Account` et sélectionnez `Zone` :
+   ![](img/doc-rocket-chat-cloudflare-dns-01-0004.png)
+5. Cliquez sur le second menu déroulant `Select an item...` et sélectionnez `DNS` :
+   ![](img/doc-rocket-chat-cloudflare-dns-01-0005.png)
+6. Cliquez enfin sur le 3e menu déroulant et sélectionnez `Edit` :
+   ![](img/doc-rocket-chat-cloudflare-dns-01-0006.png)
+7. Nous allons maintenant restreindre l'accès du jeton à une zone spécifique, cliquez sur le menu déroulant `All zones` et, à la place, sélectionnez `Specific zone` :
+   ![](img/doc-rocket-chat-cloudflare-dns-01-0007.png)
+8. Sélectionnez enfin la zone DNS qui nous intéresse (`lghs.be`) :
+   ![](img/doc-rocket-chat-cloudflare-dns-01-0008.png)
+9. Passez la section relative à la date d'expiration (on veut un jeton toujours active) et cliquez sur le bouton `Continue to summary` :
+   ![](img/doc-rocket-chat-cloudflare-dns-01-0009.png)
+10. Cliquez sur le bouton `Create Token` :
+   ![](img/doc-rocket-chat-cloudflare-dns-01-0010.png)
+11. Cliquez sur le bouton `Copy` pour copier votre jeton dans le presse papier. Notez que vous avez aussi la possibilité de tester votre jeton avec la commande `curl` spécifiée.
+   ![](img/doc-rocket-chat-cloudflare-dns-01-0011.png)
+
+Sur `lghs-chat-prod`, créez ensuite le fichier suivant en remplacant la valeur par le jeton que vous venez de copier.
+
+```
+/etc/letsencrypt/cloudflare-api-token.ini
+```
+```
+dns_cloudflare_api_token = MON_JETON_CLOUDFLAREs
+```
+
+Pour éviter le message d'erreur suivant :
 ```
 [...]
 Unsafe permissions on credentials configuration file: /etc/letsencrypt/cloudflare-api-token.ini
 [...]
 ```
-
+changez les permissions d'accès au fichier :
+```
 chmod 600 /etc/letsencrypt/cloudflare-api-token.ini
+```
 
+Générez enfin votre certificat avec la commande suivante :
+```
+certbot certonly --dns-cloudflare --dns-cloudflare-credentials /etc/letsencrypt/cloudflare-api-token.ini -d chat.lghs.be
+```
+
+La génération devrait se passer sans trop de souci et le certificat présent à l'emplacement `/etc/letsencrypt/live/chat.lghs.be/fullchain.pem`. Dans le cas contraire, ajoutez l'argument `--staging` pour générer des certificats de test pour déboguer et ainsi éviter le rate limit de LetsEncrypt ([src.](https://letsencrypt.org/docs/rate-limits/)).
+
+Activez ensuite la configuration NGINX :
+```
+root@lghs-chat-prod:/srv/chat.lghs.be# ln -s /etc/nginx/sites-available/rocketchat.conf /etc/nginx/sites-enabled/rocketchat.conf
+```
+Testez ensuite la configuration et redémarrez NGINX :
+```
+root@lghs-chat-prod:/srv/chat.lghs.be# nginx -t
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+root@lghs-chat-prod:/srv/chat.lghs.be# systemctl restart nginx
+```
 
 ## Upgrade vers 3.18.2
 
