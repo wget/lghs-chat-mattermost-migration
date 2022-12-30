@@ -2,7 +2,7 @@
 
 ## Situation initiale
 
-La prod actuelle se trouve sur `escandalo`, une machine mise à disposition par Yulpa, et uniquement accessible en IPv4 (`185.217.152.58`). Cette machine n'est d'ailleurs plus présente dans l'infra maintenue de Yulpa ; pour preuve le reverse DNS utilisé par ces derniers : `58.152.217.185.not.updated.as199712.fr`.
+La prod actuelle se trouve sur `escandalo`, une machine mise à disposition par Yulpa, et uniquement accessible en IPv4 (`185.217.152.58`). Cette machine n'est d'ailleurs plus présente dans l'infra maintenue de Yulpa ; pour preuve le reverse DNS utilisé par ces derniers : `58.152.217.185.not.updated.as199712.fr`.
 
 Il n'est pas non plus possible de mettre à jour sa base (son OS), car il s'agit d'un conteneur LXC. Tenter de le mettre à jour casse l'ABI de virtualisation utilisée sur l'hôte et le conteneur ne redémarre plus.
 
@@ -12,7 +12,7 @@ Cette machine est malheureusement infectée par un crypto miner qui accapare sou
 
 En outre, il est fort à parier que le serveur soit membre d'un botnet, car, régulièrement, une charge utile s'ouvre sur le port 2000 (en TCP). Il s'agit vraisemblablement du port utilisé par un serveur distant de type « Command and control » ([src.](https://en.wikipedia.org/wiki/Botnet#Command_and_control)). Nous avons détecté ce comportement via l'outil de Monitoring fourni par Shodan. ([src.](https://www.shodan.io/host/185.217.152.58))
 
-En outre, le certificat de cette machine retourne un domaine pour `chat-temp.lghs.be` qui semble indiquer que le chat était précédemment accessible par cette adresse également. Voici le rapport d'état qu'on reçoit par mail pour ce souci (toujours via Shodan.io) :
+En outre, le certificat de cette machine retourne un domaine pour `chat-temp.lghs.be` qui semble indiquer que le chat était précédemment accessible par cette adresse également. Voici le rapport d'état qu'on reçoit par mail pour ce souci (toujours via Shodan.io) :
 
 ```
 185.217.152.58
@@ -30,14 +30,14 @@ Bien que l'objectif final soit de permettre une migration à Mattermost, l'état
 
 De même, il n'existait pas avant ce projet de migration de script permettant un import de données au sein de Mattermost. Ce dernier, lorsque la fonctionnalité de « compliance report » est active ne permet pas d'insérer des données en conservant la date de publication. (Notons que la fonctionnalité de confirmité - « compliance report » - est activée par défaut et ne peut, à notre connaissance, pas être désactivée facilement sur les versions actuelles de Mattermost). Insérer des données dans le passé est donc impossible. Pour qu'elles soit conservées, il faut que les données historiques soient migrées directement dès le début avant même que de nouvelles données soient insérées. 
 
-La migration vers Mattermost doit donc se faire en 2 étapes :
+La migration vers Mattermost doit donc se faire en 2 étapes :
 
-**Phase 1** : Upgrade à la dernière version de Rocket.Chat ce qui permet :
+**Phase 1** : Upgrade à la dernière version de Rocket.Chat ce qui permet :
 
 1. D'avoir un serveur stable qui ne soit plus vulnérable et à partir duquel continuer la migration
 2. D'activer la version Entreprise de Rocket.Chat gratuitement pour 30 jours afin de bénéficier de la levée des limites en matière de notifications push. En effet, la version Community de Rocket.Chat est désormais bridée à 1000 notifications push par mois. Il est nécessaire de passer à la version Entreprise pour lever cette limitation. ([src.](https://forums.rocket.chat/t/push-notification-pricing/3006))
 
-**Phase 2** :
+**Phase 2** :
 
 1. Migration des données (canaux, chats, threads, fichiers joints et émojis)
 2. Installation d'une nouvelle configuration oAuth sur Keycloak
@@ -61,7 +61,7 @@ Pour que les autres membres du LgHS puissent y accéder, voici les étapes de cr
    ![](img/doc-rocket-chat-scaleway-machine-creation-0003.png)
 5. Cliquez ensuite sur le bouton `Add a new SSH key`.
    ![](img/doc-rocket-chat-scaleway-machine-creation-0004.png)
-6. Créez ensuite une clé au format ed25519 avec la commande suivante ([src.](https://wiki.archlinux.org/title/SSH_keys#Ed25519)) :
+6. Créez ensuite une clé au format ed25519 avec la commande suivante ([src.](https://wiki.archlinux.org/title/SSH_keys#Ed25519)) :
    ```
    ssh-keygen -t ed25519
    ```
@@ -108,7 +108,7 @@ Pour que les autres membres du LgHS puissent y accéder, voici les étapes de cr
 
 ## Connexion à la machine
 
-Créez une entrée dans votre fichier `~/.ssh/config` :
+Créez une entrée dans votre fichier `~/.ssh/config` :
 ```
 Host lghs-chat-prod
     User root
@@ -119,7 +119,7 @@ Host lghs-chat-prod
 
 Attention, notez que si vous décidez de placer par la suite la machine derrière Cloudflare, Cloudflare ne pourra pas par défaut jouer le rôle de proxy SSH, il faudra alors remapper le domaine sur les adresses IP réelles et non celles de Cloudflare. Pour ce faire il faudra placer les adresses IP réelles dans votre fichier `hosts`. C'est la seule méthode valable, OpenSSH est alors assez malin pour choisir la bonne adresse IP selon la stack IP employée (il comprend le fichier `hosts` et ne prendra donc pas le premier venu). ([src.](https://stackoverflow.com/questions/56413458/ssh-config-multiple-hostname-to-the-same-host#comment119695613_56413679))
 
-Voici un exemple avec `vahine` :
+Voici un exemple avec `vahine` :
 ```
 /etc/hosts
 ```
@@ -148,7 +148,7 @@ Host lghs-chat-prod
 
 ### Sécurisation SSH
 
-Connectez-vous sur `lghs-chat-prod` et assurez-vous que la connexion par mot de passe soit autorisée et que la machine dispose bien d'un mot de passe sur le compte root :
+Connectez-vous sur `lghs-chat-prod` et assurez-vous que la connexion par mot de passe soit autorisée et que la machine dispose bien d'un mot de passe sur le compte root :
 ```
 /etc/ssh/sshd_config
 ```
@@ -183,7 +183,7 @@ passwd: password updated successfully
 
 Connectez-vous à ladite machine et préparons l'environnement Docker.
 
-Commencez par mettre à jour la machine et à installer les outils dont nous aurons besoin :
+Commencez par mettre à jour la machine et à installer les outils dont nous aurons besoin :
 ```
 apt update && apt dist-upgrade -y && apt install -y tmux vim rsync
 ```
@@ -194,7 +194,7 @@ Lancez un tmux, très utile pour conserver le shell lors de la migration, et év
 tmux new -s wget
 ```
 
-Installons le moteur Docker pour Debian 11 ([src.](https://docs.docker.com/engine/install/debian/)) :
+Installons le moteur Docker pour Debian 11 ([src.](https://docs.docker.com/engine/install/debian/)) :
 
 ```
 apt-get remove docker docker-engine docker.io containerd runc
@@ -207,13 +207,13 @@ apt-get update
 apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 ```
 
-Une fois installé, vérifiez que la version 2 de Compose a bien été installée (en effet nous utilisons cette version plutôt que la version 1 dépréciée) :
+Une fois installé, vérifiez que la version 2 de Compose a bien été installée (en effet nous utilisons cette version plutôt que la version 1 dépréciée) :
 ```
 $ docker compose version
 Docker Compose version v2.14.1
 ```
 
-Installez le frontend NGINX (dépôt Debian) et certbot + méthode DNS-01 via Cloudflare par snap (Snap est la méthode officielle recommandée pour avoir la dernière version) : [src.](https://certbot.eff.org/instructions?ws=nginx&os=debianbuster)
+Installez le frontend NGINX (dépôt Debian) et certbot + méthode DNS-01 via Cloudflare par snap (Snap est la méthode officielle recommandée pour avoir la dernière version) : [src.](https://certbot.eff.org/instructions?ws=nginx&os=debianbuster)
 ```
 apt install -y nginx
 apt install -y snapd
@@ -225,7 +225,7 @@ snap set certbot trust-plugin-with-root=ok
 snap install certbot-dns-cloudflare
 ```
 
-Créez les répertoires dont on a besoin pour le déploiement Docker :
+Créez les répertoires dont on a besoin pour le déploiement Docker :
 ```
 mkdir -p /srv/chat.lghs.be/{data,backups}
 cd /srv/chat.lghs.be/
@@ -233,7 +233,7 @@ cd /srv/chat.lghs.be/
 
 ## Transfert des données
 
-Connectez-bous sur `escandalo`, allez dans le répertoire home de votre utilisateur et exportez la base de données qui, par défaut, donnera un dossier nommé `dump` dans le répertoire de travail actuel :
+Connectez-bous sur `escandalo`, allez dans le répertoire home de votre utilisateur et exportez la base de données qui, par défaut, donnera un dossier nommé `dump` dans le répertoire de travail actuel :
 ```
 $ cd /home/willget
 $ mongodump
@@ -249,7 +249,7 @@ rsync -av --info=progress2 dump root@lghs-chat-prod.lghs.space:/srv/chat.lghs.be
 
 ## Déploiement d'un Rocket.Chat 3.0.12
 
-Bien que la version actuellement en production soit la 3.0.11, nous allons installer une 3.0.12, car la 3.0.11 ne dispose pas une image Docker disponible. ([src.](https://hub.docker.com/layers/library/rocket.chat/3.0.12/images/sha256-6d9a0ede1e2648f0f9f2db52bfe7a3f5888ea2db3d5f94fc48560b1979917d97?context=explore))
+Bien que la version actuellement en production soit la 3.0.11, nous allons installer une 3.0.12, car la 3.0.11 ne dispose pas d'une image Docker. ([src.](https://hub.docker.com/layers/library/rocket.chat/3.0.12/images/sha256-6d9a0ede1e2648f0f9f2db52bfe7a3f5888ea2db3d5f94fc48560b1979917d97?context=explore))
 
 Sur `lghs-chat-prod`, allez dans `/srv/chat.lghs.be/` et placez dans ce dossier le fichier Docker Compose (`docker-compose-prod-3.0.12.yml`) suivant (basé sur l'ancien Docker Compose officiel du temps de la 3.0.11 ([src.](https://github.com/RocketChat/Rocket.Chat/blob/5fbbc7d4b907177065497f71122ccb39ec999011/docker-compose.yml))):
 ```
@@ -334,7 +334,7 @@ root@79f9ab2ea43a:/# mongorestore --drop dump-2022-12-17/dump
 2022-12-17T06:19:06.404+0000    513657 document(s) restored successfully. 0 document(s) failed to restore.
 ```
 
-L'option `--drop` a été nécessaire car nous rencontrions l'erreur suivante qui pouvait être causée à cause d'index invalides :
+L'option `--drop` a été nécessaire car nous rencontrions l'erreur suivante qui pouvait être causée à cause d'index invalides :
 ```
 rocketchat rocketchat_uploads.chunks.bson: connection(localhost:27017[-5]) incomplete read of message header: EOF
 ```
@@ -403,12 +403,12 @@ Décommenter les lignes relatives à Rocket.Chat:
      image: mongo:4.2.22
 ```
 
-Redémarrez la stack Docker :
+Redémarrez la stack Docker :
 ```
 root@lghs-chat-prod:/srv/chat.lghs.be# docker compose -f docker-compose-prod-3.0.12.yml up -d
 ```
 
-La première fois que Rocket.Chat démarrera (et potentiellement les fois suivantes également), il est susceptible que vous recontriez l'erreur suivante en logs du conteneur Docker de Rocket.Chat. Cette erreur est normale, elle indique juste que Rocket n'a pas pu trouver le serveur Mongo spécifié, il faut juste laisser plus de temps à Mongo pour démarrer (c'est ce qui explique la commande Bash dans la recette Docker Compose qui effectue plusieurs tentatives). ([src.](https://github.com/RocketChat/Rocket.Chat/issues/6963)) :
+La première fois que Rocket.Chat démarrera (et potentiellement les fois suivantes également), il est susceptible que vous recontriez l'erreur suivante en logs du conteneur Docker de Rocket.Chat. Cette erreur est normale, elle indique juste que Rocket n'a pas pu trouver le serveur Mongo spécifié, il faut juste laisser plus de temps à Mongo pour démarrer (c'est ce qui explique la commande Bash dans la recette Docker Compose qui effectue plusieurs tentatives). ([src.](https://github.com/RocketChat/Rocket.Chat/issues/6963)) :
 ```
 [...]
 $MONGO_OPLOG_URL must be set to the 'local' database of a Mongo replica set
@@ -419,8 +419,7 @@ Par défaut, le conteneur Docker et sa recette Compose sont configurés pour éc
 
 ## Configuration d'un reverse-proxy HTTP
 
-Placez la configuration NGINX suivante dans `/etc/nginx/sites-available/rocketchat.conf` ([src.](https://docs.rocket.chat/quick-start/environment-configuration/configuring-ssl-reverse-proxy))
- :
+Placez la configuration NGINX suivante dans `/etc/nginx/sites-available/rocketchat.conf` ([src.](https://docs.rocket.chat/quick-start/environment-configuration/configuring-ssl-reverse-proxy)) :
 ```
 upstream backend {
     server [::1]:3000;
@@ -487,21 +486,21 @@ Générons ensuite une clé d'API sur Cloudflare spécifique à la zone `lghs.be
    ![](img/doc-rocket-chat-cloudflare-dns-01-0001.png)
 2. On ne veut pas se baser sur un modèle existant, descendez dans le bas de la page et cliquez sur `Get started`
    ![](img/doc-rocket-chat-cloudflare-dns-01-0002.png)
-3. Spéfifiez un nom évocateur pour le jeton, ici `chat.lghs.be acme DNS-01` :
+3. Spéfifiez un nom évocateur pour le jeton, ici `chat.lghs.be acme DNS-01` :
    ![](img/doc-rocket-chat-cloudflare-dns-01-0003.png)
-4. Pour ce qui est des permissions, cliquez sur le menu déroulant `Account` et sélectionnez `Zone` :
+4. Pour ce qui est des permissions, cliquez sur le menu déroulant `Account` et sélectionnez `Zone` :
    ![](img/doc-rocket-chat-cloudflare-dns-01-0004.png)
-5. Cliquez sur le second menu déroulant `Select an item...` et sélectionnez `DNS` :
+5. Cliquez sur le second menu déroulant `Select an item...` et sélectionnez `DNS` :
    ![](img/doc-rocket-chat-cloudflare-dns-01-0005.png)
-6. Cliquez enfin sur le 3e menu déroulant et sélectionnez `Edit` :
+6. Cliquez enfin sur le 3e menu déroulant et sélectionnez `Edit` :
    ![](img/doc-rocket-chat-cloudflare-dns-01-0006.png)
-7. Nous allons maintenant restreindre l'accès du jeton à une zone spécifique, cliquez sur le menu déroulant `All zones` et, à la place, sélectionnez `Specific zone` :
+7. Nous allons maintenant restreindre l'accès du jeton à une zone spécifique, cliquez sur le menu déroulant `All zones` et, à la place, sélectionnez `Specific zone` :
    ![](img/doc-rocket-chat-cloudflare-dns-01-0007.png)
-8. Sélectionnez enfin la zone DNS qui nous intéresse (`lghs.be`) :
+8. Sélectionnez enfin la zone DNS qui nous intéresse (`lghs.be`) :
    ![](img/doc-rocket-chat-cloudflare-dns-01-0008.png)
-9. Passez la section relative à la date d'expiration (on veut un jeton toujours active) et cliquez sur le bouton `Continue to summary` :
+9. Passez la section relative à la date d'expiration (on veut un jeton toujours active) et cliquez sur le bouton `Continue to summary` :
    ![](img/doc-rocket-chat-cloudflare-dns-01-0009.png)
-10. Cliquez sur le bouton `Create Token` :
+10. Cliquez sur le bouton `Create Token` :
    ![](img/doc-rocket-chat-cloudflare-dns-01-0010.png)
 11. Cliquez sur le bouton `Copy` pour copier votre jeton dans le presse papier. Notez que vous avez aussi la possibilité de tester votre jeton avec la commande `curl` spécifiée.
    ![](img/doc-rocket-chat-cloudflare-dns-01-0011.png)
@@ -515,29 +514,29 @@ Sur `lghs-chat-prod`, créez ensuite le fichier suivant en remplacant la valeur 
 dns_cloudflare_api_token = MON_JETON_CLOUDFLAREs
 ```
 
-Pour éviter le message d'erreur suivant :
+Pour éviter le message d'erreur suivant :
 ```
 [...]
 Unsafe permissions on credentials configuration file: /etc/letsencrypt/cloudflare-api-token.ini
 [...]
 ```
-changez les permissions d'accès au fichier :
+changez les permissions d'accès au fichier :
 ```
 chmod 600 /etc/letsencrypt/cloudflare-api-token.ini
 ```
 
-Générez enfin votre certificat avec la commande suivante ([src.](https://certbot-dns-cloudflare.readthedocs.io/en/stable/)) :
+Générez enfin votre certificat avec la commande suivante ([src.](https://certbot-dns-cloudflare.readthedocs.io/en/stable/)) :
 ```
 certbot certonly --dns-cloudflare --dns-cloudflare-credentials /etc/letsencrypt/cloudflare-api-token.ini -d chat.lghs.be
 ```
 
 La génération devrait se passer sans trop de souci et le certificat présent à l'emplacement `/etc/letsencrypt/live/chat.lghs.be/fullchain.pem`. Dans le cas contraire, ajoutez l'argument `--staging` pour générer des certificats de test pour déboguer et ainsi éviter le rate limit de LetsEncrypt ([src.](https://letsencrypt.org/docs/rate-limits/)).
 
-Activez ensuite la configuration NGINX :
+Activez ensuite la configuration NGINX :
 ```
 root@lghs-chat-prod:/srv/chat.lghs.be# ln -s /etc/nginx/sites-available/rocketchat.conf /etc/nginx/sites-enabled/rocketchat.conf
 ```
-Testez ensuite la configuration et redémarrez NGINX :
+Testez ensuite la configuration et redémarrez NGINX :
 ```
 root@lghs-chat-prod:/srv/chat.lghs.be# nginx -t
 nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
@@ -551,7 +550,7 @@ Pour l'upgrade, il faut passer par chaque version majeure obligatoirement. ([src
 
 Passer à la dernière vesion de la branche 4.x ne fonctionne pas directement à cause d'étapes de schéma de migration qui ne sont plus présentes dans la version 4.
 
-Cependant, passer directement de la 3.0.12 à la 3.18.2 ne fonctionne pas non plus sans souci, car la migration de schéma de DB ne passe pas correctement au schéma de base de données version 231. Il faut pour ce faire désactiver temporairement les modules oAuth/SAML. La migration 231 correspond à une requête mongo relative au plugin oAuth :
+Cependant, passer directement de la 3.0.12 à la 3.18.2 ne fonctionne pas non plus sans souci, car la migration de schéma de DB ne passe pas correctement au schéma de base de données version 231. Il faut pour ce faire désactiver temporairement les modules oAuth/SAML. La migration 231 correspond à une requête mongo relative au plugin oAuth :
 ```
 const query = {
     _id: { $in: [/^Accounts_OAuth_(Custom-)?([^-_]+)$/, 'Accounts_OAuth_GitHub_Enterprise'] },
@@ -561,12 +560,12 @@ const query = {
 
 ([src.](https://github.com/RocketChat/Rocket.Chat/blob/4.5.7/server/startup/migrations/v231.ts#L17-L19)) L'erreur semble connue. ([src.](https://github.com/RocketChat/Rocket.Chat/issues/27014))
 
-Considérons que RocketChat 3.0.12 est en cours d'exécution. Stoppons d'abord le conteneur Docker de Rocket.Chat tout en laissant Mongo tourner :
+Considérons que RocketChat 3.0.12 est en cours d'exécution. Stoppons d'abord le conteneur Docker de Rocket.Chat tout en laissant Mongo tourner :
 ```
 docker stop chatlghsbe-rocketchat-1
 ```
 
-Désactivons temporairement le plugin de Rochet.Chat relative à l'auth oAuth :
+Désactivons temporairement le plugin de Rochet.Chat relative à l'auth oAuth :
 ```
 root@lghs-chat-test:/srv/chat.lghs.be# docker exec -it chatlghsbe-mongo-1 /bin/bash
 root@e80c9dfa0fb1:/# mongo
@@ -595,13 +594,13 @@ rs0:PRIMARY> col.findOne({_id: { $in: [/^Accounts_OAuth_(Custom-)?([^-_]+)$/, 'A
 }
 ```
 
-La désactivation du plugin passe par cette commande :
+La désactivation du plugin passe par cette commande :
 ```
 rs0:PRIMARY> col.update({"_id" : "Accounts_OAuth_Custom-Authlghsbe"}, {$set: { "value" : false }})
 WriteResult({ "nMatched" : 1, "nUpserted" : 0, "nModified" : 1 })
 ```
 
-Il est ensuite nécessaire de tuer les index de Rocket.Chat, sinon les migration de schéma échoueront. Pour ce faire, toujours à partir du shell Mondo DB :
+Il est ensuite nécessaire de tuer les index de Rocket.Chat, sinon les migration de schéma échoueront. Pour ce faire, toujours à partir du shell Mondo DB :
 ```
 db.rocketchat_nps_vote.dropIndexes()
 db.users.dropIndexes()
@@ -615,12 +614,12 @@ db.rocketchat_apps_logs.dropIndexes()
 
 
 
-Quittons le shell Mongo et le conteneur mongo et stoppons le reste de l'environnement Docker :
+Quittons le shell Mongo et le conteneur mongo et stoppons le reste de l'environnement Docker :
 ```
 docker compose -f docker-compose-prod-3.0.12.yml down
 ```
 
-Copions le fichier Docker Compose et changeons la version de Rocket.Chat :
+Copions le fichier Docker Compose et changeons la version de Rocket.Chat :
 ```
 cd /srv/chat.lghs.be
 cp docker-compose-prod-3.0.12.yml docker-compose-prod-3.18.2.yml
@@ -645,7 +644,7 @@ cp docker-compose-prod-3.0.12.yml docker-compose-prod-3.18.2.yml
 docker compose -f docker-compose-prod-3.18.2.yml up -d
 ```
 
-Une fois que `mongo-init-replica` est quitté, 20 secondes après, l'état de démarrage de Rocket.Chat peut être suivi avec :
+Une fois que `mongo-init-replica` est quitté, 20 secondes après, l'état de démarrage de Rocket.Chat peut être suivi avec :
 ```
 $ docker logs -f chatlghsbe-rocketchat-1
 [...]
@@ -676,10 +675,10 @@ root@lghs-chat-test:/srv/chat.lghs.be# docker exec -it chatlghsbe-mongo-1 /bin/b
 root@e80c9dfa0fb1:/# mongo
 rs0:PRIMARY> use rocketchat
 rs0:PRIMARY> var col = db.getCollection('rocketchat_settings')
-rs0:PRIMARY> col.update({"_id" : "Accounts_OAuth_Custom-Authlghsbe"}, {$set: { "value" : true }})
+rs0:PRIMARY> col.update({"_id" : "Accounts_OAuth_Custom-Authlghsbe"}, {$set: { "value" : true }})
 ```
 
-On quitte le reste de la stack Docker et on relance le tout :
+On quitte le reste de la stack Docker et on relance le tout :
 ```
 root@lghs-chat-test:/srv/chat.lghs.be# docker compose -f docker-compose-prod-3.18.2.yml down
 root@lghs-chat-test:/srv/chat.lghs.be# docker compose -f docker-compose-prod-3.18.2.yml up -d
@@ -700,7 +699,7 @@ Nouvelle passerelle enregistrée correctment et nouvelles CGU activées, mais da
 
 En cliquant sur le bouton de test pour générer une notification sur les périphériques mobiles, on obtenait un message d'erreur indiquant qu'il n'y avait pas de jeton pour l'utilisateur en cours. Pour pallier ce problème, nous avons juste dû ous déconnecter de l'app mobile et nous reconnecter. Appuyer sur le bouton de test a alors fonctionné avec un toast indiquant que l'action s'était bien passée, mais nous ne recevions quand même pas la notification sur le mobile. 
 
-En regardant dans les logs, on a vu la raison :
+En regardant dans les logs, on a vu la raison :
 
 ```
 root@lghs-chat-prod:/srv/chat.lghs.be# docker logs -f chatlghsbe-rocketchat-1
@@ -752,7 +751,7 @@ Pour le passage de la 3.18.2 à 4.8.6, exécuter les commandes précédentes jus
 
 ## Upgrade vers 5.4.1
 
-On a obtenu la stack trace suivante :
+On a obtenu la stack trace suivante :
 ```
 [...]
 ervers: Map(1) {                                                                                                                                                              [41/1821]
@@ -814,7 +813,7 @@ https://github.com/RocketChat/Rocket.Chat/releases/tag/4.8.7
 
 
 
-Il a ensuite fallu délocker les migrations pour qu'elles puissent s'exécuter à nouveau :
+Il a ensuite fallu délocker les migrations pour qu'elles puissent s'exécuter à nouveau :
 ```
 rs0:PRIMARY> use rocketchat
 rs0:PRIMARY> db.migrations.update({"_id": "control"}, {$set:{locked: false}})
@@ -862,39 +861,39 @@ De façon a éviter ce cas de figure et de façon à éviter de reproduire la si
    ![](img/doc-rocket-chat-scaleway-machine-firewall-0003.png)
 4. Défillez vers le bas pour atteindre le bas de la page, en passant la définition des règles (on les définira après) et cliquez sur le bouton `Create a new security group`.
    ![](img/doc-rocket-chat-scaleway-machine-firewall-0004.png)
-5. Retournez sur l'instance de machine, toujours via le lien `Instances` dans la barre latérale de gauche, onglet `Instances` et en cliquant sur l'instance `lghs-chat` :
+5. Retournez sur l'instance de machine, toujours via le lien `Instances` dans la barre latérale de gauche, onglet `Instances` et en cliquant sur l'instance `lghs-chat` :
    ![](img/doc-rocket-chat-scaleway-machine-firewall-0005.png)
-6. Faites défiler la page vers le bas pour atteindre les groupes de sécurité et cliquez sur l'icône en forme de crayon :
+6. Faites défiler la page vers le bas pour atteindre les groupes de sécurité et cliquez sur l'icône en forme de crayon :
    ![](img/doc-rocket-chat-scaleway-machine-firewall-0006.png)
-7. Dans le menu déroulant, changez le groupe de `Default security group` à `hardened-conf` (le groupe qu'on a défini précédemment) :
+7. Dans le menu déroulant, changez le groupe de `Default security group` à `hardened-conf` (le groupe qu'on a défini précédemment) :
    ![](img/doc-rocket-chat-scaleway-machine-firewall-0007.png)
-8. Cliquez que le bouton `Save` :
+8. Cliquez que le bouton `Save` :
    ![](img/doc-rocket-chat-scaleway-machine-firewall-0008.png)
-9. Constatez que le groupe de sécurité a changé pour notre machine :
+9. Constatez que le groupe de sécurité a changé pour notre machine :
    ![](img/doc-rocket-chat-scaleway-machine-firewall-0009.png)
-10. Retournez dans les groupes de sécurité en passant par le lien `Instances` de la barre latérale de gauche et en cliquant sur l'onglet `Security Groups` :
+10. Retournez dans les groupes de sécurité en passant par le lien `Instances` de la barre latérale de gauche et en cliquant sur l'onglet `Security Groups` :
    ![](img/doc-rocket-chat-scaleway-machine-firewall-0010.png)
-11. Sélectionnez le groupe de sécurité que vous venez de créer (`hardened-conf`) :
+11. Sélectionnez le groupe de sécurité que vous venez de créer (`hardened-conf`) :
    ![](img/doc-rocket-chat-scaleway-machine-firewall-0011.png)
-12. Allez dans l'onglet `Rules` :
+12. Allez dans l'onglet `Rules` :
    ![](img/doc-rocket-chat-scaleway-machine-firewall-0012.png)
-13. Changez la politique par défaut pour le trafic entrant en cliquant sur le petit crayon :
+13. Changez la politique par défaut pour le trafic entrant en cliquant sur le petit crayon :
    ![](img/doc-rocket-chat-scaleway-machine-firewall-0013.png)
-14. Passez le paramètre `Inbound default policy` sur `Drop` :
+14. Passez le paramètre `Inbound default policy` sur `Drop` :
    ![](img/doc-rocket-chat-scaleway-machine-firewall-0014.png)
-15. Confirmez le changement en cliquant sur le bouton avec la flèche verte :
+15. Confirmez le changement en cliquant sur le bouton avec la flèche verte :
    ![](img/doc-rocket-chat-scaleway-machine-firewall-0015.png)
-16. Passons maintenant aux règles à proprement parler, ce qui nous intéresse. Pour en définir, cliquez sur l'icône en forme de crayon dans la sections `Rules` (règles) :
+16. Passons maintenant aux règles à proprement parler, ce qui nous intéresse. Pour en définir, cliquez sur l'icône en forme de crayon dans la sections `Rules` (règles) :
    ![](img/doc-rocket-chat-scaleway-machine-firewall-0016.png)
-17. Cliquez sur le bouton `Add inbound rule` :
+17. Cliquez sur le bouton `Add inbound rule` :
    ![](img/doc-rocket-chat-scaleway-machine-firewall-0017.png)
-18. Définissez la première règle comme suit ; pour continuer à en ajouter, cliquez de nouveau sur le bouton `Add inbound rule` et ainsi de suite :
+18. Définissez la première règle comme suit ; pour continuer à en ajouter, cliquez de nouveau sur le bouton `Add inbound rule` et ainsi de suite :
    ![](img/doc-rocket-chat-scaleway-machine-firewall-0018.png)
-19. Le but est d'obtenir la liste suivante. On autorise juste le traffic web (ports 80/443 à la fois en TCP et UDP - UDP pour tout ce qui est HTTP/2+/QUICK), le SSH (port 22) et l'ICMP. Notez que l'interface web de Scaleway ne prend en charge que l'ICMP et non l'ICMPv6 ce qui empèchera la machine de répondre aux requêtes ICMP en IPv6, cependant ça fonctionnerait en CLI via la commande `scw` (à tester) ([src.](https://feature-request.scaleway.com/posts/281/security-group-add-icmpv6-protocol)) :
+19. Le but est d'obtenir la liste suivante. On autorise juste le traffic web (ports 80/443 à la fois en TCP et UDP - UDP pour tout ce qui est HTTP/2+/QUICK), le SSH (port 22) et l'ICMP. Notez que l'interface web de Scaleway ne prend en charge que l'ICMP et non l'ICMPv6 ce qui empèchera la machine de répondre aux requêtes ICMP en IPv6, cependant ça fonctionnerait en CLI via la commande `scw` (à tester) ([src.](https://feature-request.scaleway.com/posts/281/security-group-add-icmpv6-protocol)) :
    ![](img/doc-rocket-chat-scaleway-machine-firewall-0019.png)
-20. Il faut autoriser les ports SMTP à soumettre des emails sinon Rocket.Chat ne sera pas autorisé à envoyer d'emails, ce qui posera problème (redéfinition de mot de passe et notifications par email notamment). Pour ce faire cochez la case `Enable SMTP Ports` :
+20. Il faut autoriser les ports SMTP à soumettre des emails sinon Rocket.Chat ne sera pas autorisé à envoyer d'emails, ce qui posera problème (redéfinition de mot de passe et notifications par email notamment). Pour ce faire cochez la case `Enable SMTP Ports` :
    ![](img/doc-rocket-chat-scaleway-machine-firewall-0020.png)
-21. Cocher la case a pour effet de vider la liste des règles prédéfinies de trafic sortant :
+21. Cocher la case a pour effet de vider la liste des règles prédéfinies de trafic sortant :
    ![](img/doc-rocket-chat-scaleway-machine-firewall-0021.png)
 22. Faites défiler la page vers le haut et cliquez sur le bouton de crayon vert pour confirmer les changements.
    ![](img/doc-rocket-chat-scaleway-machine-firewall-0022.png)
