@@ -144,10 +144,42 @@ Host lghs-chat-prod
     IdentityFile ~/.ssh/keys/william_gathoye_ssh_key_2021-10-23_lghs_ed25519
 ```
 
+## Préparation de l'environnement
 
-## Déploiement d'un Rocket.Chat 3.0.12
+### Sécurisation SSH
 
-Bien que la version actuellement en production soit la 3.0.11, nous allons installer une 3.0.12, car la 3.0.11 ne dispose pas une image Docker disponible. ([src.](https://hub.docker.com/layers/library/rocket.chat/3.0.12/images/sha256-6d9a0ede1e2648f0f9f2db52bfe7a3f5888ea2db3d5f94fc48560b1979917d97?context=explore))
+Connectez-vous sur `lghs-chat-prod` et assurez-vous que la connexion par mot de passe soit autorisée et que la machine dispose bien d'un mot de passe sur le compte root :
+```
+/etc/ssh/sshd_config
+```
+```
++++ sshd_config 2022-12-17 05:31:20.468748364 +0000
+@@ -32,6 +32,7 @@
+
+ #LoginGraceTime 2m
+ #PermitRootLogin prohibit-password
++PermitRootLogin yes
+ #StrictModes yes
+ #MaxAuthTries 6
+ #MaxSessions 10
+@@ -56,6 +57,7 @@
+
+ # To disable tunneled clear text passwords, change to no here!
+ #PasswordAuthentication no
++PasswordAuthentication yes
+ #PermitEmptyPasswords no
+
+ # Change to yes to enable challenge-response passwords (beware issues with
+```
+```
+# passwd
+New password:
+Retype new password:
+passwd: password updated successfully
+# systemctl restart sshd
+```
+
+### Installation des dépendances
 
 Connectez-vous à ladite machine et préparons l'environnement Docker.
 
@@ -181,7 +213,7 @@ $ docker compose version
 Docker Compose version v2.14.1
 ```
 
-Installez le frontend NGINX (dépôt Debian) et certbot via snap (la méthode officielle pour avoir la dernière version) : [src.](https://certbot.eff.org/instructions?ws=nginx&os=debianbuster)
+Installez le frontend NGINX (dépôt Debian) et certbot + méthode DNS-01 via Cloudflare par snap (Snap est la méthode officielle recommandée pour avoir la dernière version) : [src.](https://certbot.eff.org/instructions?ws=nginx&os=debianbuster)
 ```
 apt install -y nginx
 apt install -y snapd
@@ -195,11 +227,31 @@ snap install certbot-dns-cloudflare
 
 Créez les répertoires dont on a besoin pour le déploiement Docker :
 ```
-mkdir /srv/chat.lghs.be
+mkdir -p /srv/chat.lghs.be/{data,backups}
 cd /srv/chat.lghs.be/
 ```
 
-Placez dans ce dossier le fichier Docker Compose (`docker-compose-prod-3.0.12.yml`) suivant (basé sur l'ancien Docker Compose officiel du tant de la 3.0.11 ([src.](https://github.com/RocketChat/Rocket.Chat/blob/5fbbc7d4b907177065497f71122ccb39ec999011/docker-compose.yml))):
+## Transfert des données
+
+Connectez-bous sur `escandalo`, allez dans le répertoire home de votre utilisateur et exportez la base de données qui, par défaut, donnera un dossier nommé `dump` dans le répertoire de travail actuel :
+```
+$ cd /home/willget
+$ mongodump
+2022-12-17T06:22:29.149+0100    writing admin.system.version to dump/admin/system.version.bson
+[...]
+2022-12-17T06:22:46.957+0100    [####....................]  rocketchat.rocketchat_uploads.chunks  2366/11555  (20.5%)
+```
+
+Transférez le dossier sur `lghs-chat-prod` (< 1 min de transfert):
+```
+rsync -av --info=progress2 dump root@lghs-chat-prod.lghs.space:/srv/chat.lghs.be/backups/dump-2022-12-17
+```
+
+## Déploiement d'un Rocket.Chat 3.0.12
+
+Bien que la version actuellement en production soit la 3.0.11, nous allons installer une 3.0.12, car la 3.0.11 ne dispose pas une image Docker disponible. ([src.](https://hub.docker.com/layers/library/rocket.chat/3.0.12/images/sha256-6d9a0ede1e2648f0f9f2db52bfe7a3f5888ea2db3d5f94fc48560b1979917d97?context=explore))
+
+Sur `lghs-chat-prod`, allez dans `/srv/chat.lghs.be/` et placez dans ce dossier le fichier Docker Compose (`docker-compose-prod-3.0.12.yml`) suivant (basé sur l'ancien Docker Compose officiel du temps de la 3.0.11 ([src.](https://github.com/RocketChat/Rocket.Chat/blob/5fbbc7d4b907177065497f71122ccb39ec999011/docker-compose.yml))):
 ```
 version: "3.9"
 
@@ -261,70 +313,17 @@ services:
 
 Le fait que le service Rocket.Chat soit commenté est tout à fait voulu. Ceci est nécessaire, car si le service Rocket.Chat est lancé alors qu'on réimporte les données, trop de mémoire et de puissance seront nécessaires, car Rocket.Chat passera continuellement son temps à réindexer les données menant inexorablement à un OOM.
 
-## Transfert des données
+De même, comme vous le voyez dans cette recette Docker Compose, le dossier `/srv/chat.lghs.be/backups` qui contient nos dumps de MongoDB est monté directement à la racine du conteneur `mongo`, dans le dossier `backups` via un volume Docker.
 
-Connectez-vous sur `lghs-chat-prod` et assurez-vous que la connexion par mot de passe soit autorisée et que la machine dispose bien d'un mot de passe sur le compte root :
+Lancez l'envionnement Docker en utilisant le fichier Docker précédemment copié.
 ```
-/etc/ssh/sshd_config
-```
-```
-+++ sshd_config 2022-12-17 05:31:20.468748364 +0000
-@@ -32,6 +32,7 @@
- 
- #LoginGraceTime 2m
- #PermitRootLogin prohibit-password
-+PermitRootLogin yes
- #StrictModes yes
- #MaxAuthTries 6
- #MaxSessions 10
-@@ -56,6 +57,7 @@
- 
- # To disable tunneled clear text passwords, change to no here!
- #PasswordAuthentication no
-+PasswordAuthentication yes
- #PermitEmptyPasswords no
- 
- # Change to yes to enable challenge-response passwords (beware issues with
-```
-```
-# passwd
-New password:                         
-Retype new password:                                                                                                          
-passwd: password updated successfully
-# systemctl restart sshd
+root@lghs-chat-prod:~# cd /srv/chat.lghs.be/
+root@lghs-chat-prod:/srv/chat.lghs.be# docker compose -f docker-compose-prod-3.0.12.yml up -d
 ```
 
-Se connecter sur `escandalo`.
-Se déplacer dans le home de l'utilisateur et exporter la base de données qui, par défaut, donnera un dossier nommé `dump` dans le répertoire de travail actuel :
+Entrez dans le conteneur relatif à la base mongodb.
 ```
-$ cd /home/willget
-$ mongodump
-2022-12-17T06:22:29.149+0100    writing admin.system.version to dump/admin/system.version.bson
-[...]
-2022-12-17T06:22:46.957+0100    [####....................]  rocketchat.rocketchat_uploads.chunks  2366/11555  (20.5%)
-```
-Transférer le dossier sur `lghs-chat-prod` (< 1 min de transfert):
-```
-rsync -av --info=progress2 dump root@lghs-chat-prod.lghs.space:/srv/chat.lghs.be/dump-2022-12-17
-```
-
-
-```
-sshfs lghs-lghs-chat-prod:/srv/chat.lghs.be/ ./lghs-chat-prod/
-```
-
-Se connecter sur `lghs-chat-prod`.
-
-
-docker compose -f docker-compose-prod-3.0.12.yml up -d
-
-
-
-
-
-et entrer dans le conteneur relatif à la base mongodb.
-```
-docker exec -it chatlghsbe-mongo-1 /bin/bash
+root@lghs-chat-prod:/srv/chat.lghs.be# docker exec -it chatlghsbe-mongo-1 /bin/bash
 root@79f9ab2ea43a:/# cd /backups/
 root@79f9ab2ea43a:/# mongorestore --drop dump-2022-12-17/dump
 [...]
@@ -340,16 +339,79 @@ L'option `--drop` a été nécessaire car nous rencontrions l'erreur suivante qu
 rocketchat rocketchat_uploads.chunks.bson: connection(localhost:27017[-5]) incomplete read of message header: EOF
 ```
 
+Cet argument ne fonctionne correctement uniquement si on commente le service Rocket.Chat du fichier Docker Compose pour éviter qu'il ne démarre. Dans le cas contraire, Rocket.Chat essayera de reconstruire les index alors qu'ils sont en cours de suppression, ce qui mènera inexorablement à un crash sans compter les éventuels OOM.
 
-Fonctionne uniquement, si on commente le service Rocket.Chat du fichier Docker Compose pour éviter qu'il ne démarre.
+Une fois que tout a été importé, stoppez la stack Docker.
+```
+root@lghs-chat-prod:/srv/chat.lghs.be# docker compose -f docker-compose-prod-3.0.12.yml down
+```
 
+Décommenter les lignes relatives à Rocket.Chat:
+```
+--- docker-compose-prod-3.0.12.yml      2022-12-30 12:14:23.947310332 +0100
++++ docker-compose-prod-3.0.12-new.yml   2022-12-30 12:51:10.821627262 +0100
+@@ -1,28 +1,28 @@
+ version: "3.9"
 
+ services:
+-  #  rocketchat:
+-  #    image: rocketchat/rocket.chat:3.0.12
+-  #    command: >
+-  #      bash -c
+-  #        "for i in `seq 1 30`; do
+-  #          node main.js &&
+-  #          s=$$? && break || s=$$?;
+-  #          echo \"Tried $$i times. Waiting 5 secs...\";
+-  #          sleep 5;
+-  #        done; (exit $$s)"
+-  #    restart: unless-stopped
+-  #    volumes:
+-  #      - "/srv/chat.lghs.be/data/www:/app/uploads/"
+-  #    environment:
+-  #      - PORT=3000
+-  #      - ROOT_URL=http://localhost:3000
+-  #      - MONGO_URL=mongodb://mongo:27017/rocketchat
+-  #      - MONGO_OPLOG_URL=mongodb://mongo:27017/local
+-  #    depends_on:
+-  #      - mongo
+-  #    ports:
+-  #      - 3000:3000
++  rocketchat:
++    image: rocketchat/rocket.chat:3.0.12
++    command: >
++      bash -c
++        "for i in `seq 1 30`; do
++          node main.js &&
++          s=$$? && break || s=$$?;
++          echo \"Tried $$i times. Waiting 5 secs...\";
++          sleep 5;
++        done; (exit $$s)"
++    restart: unless-stopped
++    volumes:
++      - "/srv/chat.lghs.be/data/www:/app/uploads/"
++    environment:
++      - PORT=3000
++      - ROOT_URL=http://localhost:3000
++      - MONGO_URL=mongodb://mongo:27017/rocketchat
++      - MONGO_OPLOG_URL=mongodb://mongo:27017/local
++    depends_on:
++      - mongo
++    ports:
++      - 3000:3000
 
-La stack trace suivante est tout à fait normale. Il faut juste laisser mongo plus de temps à démarrer. ([src.](https://github.com/RocketChat/Rocket.Chat/issues/6963))
+   mongo:
+     image: mongo:4.2.22
+```
 
+Redémarrez la stack Docker :
+```
+root@lghs-chat-prod:/srv/chat.lghs.be# docker compose -f docker-compose-prod-3.0.12.yml up -d
+```
+
+La première fois que Rocket.Chat démarrera (et potentiellement les fois suivantes également), il est susceptible que vous recontriez l'erreur suivante en logs du conteneur Docker de Rocket.Chat. Cette erreur est normale, elle indique juste que Rocket n'a pas pu trouver le serveur Mongo spécifié, il faut juste laisser plus de temps à Mongo pour démarrer (c'est ce qui explique la commande Bash dans la recette Docker Compose qui effectue plusieurs tentatives). ([src.](https://github.com/RocketChat/Rocket.Chat/issues/6963)) :
 ```
 [...]
-$MONGO_OPLOG_URL must be set to the 'local' database of a Mongo replica se
+$MONGO_OPLOG_URL must be set to the 'local' database of a Mongo replica set
 [...]
 ```
 
