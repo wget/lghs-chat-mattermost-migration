@@ -12,6 +12,17 @@ In practise, this repository gathers the following pieces:
 * the configuration files and patches used during the migration process (e.g. NGINX configuration)
 * the code used to import data from Rocket.Chat to Mattermost with the ultimate goal of upstreaming this work to the Mattermost code base.
 
+## Screenshots
+
+Most of the screenshots have been taken using the free hand tool on KDE meaning their size was not identical everywhere, sometimes 2559x1360, sometimes 2559x1358, etc.
+
+We truncated everything to 2559x1355 from the bottom of the images using the following trick from ImageMagick :
+
+```
+mogrify -crop 2559x1355+0+0 -gravity South *.png
+```
+
+([src.](https://imagemagick.org/Usage/crop), chapter named `Crop relative to Gravity`.)
 
 ## License
 
