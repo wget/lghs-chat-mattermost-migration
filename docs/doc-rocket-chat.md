@@ -423,7 +423,7 @@ Placez la configuration NGINX suivante dans `/etc/nginx/sites-available/rocketch
  :
 ```
 upstream backend {
-    server 127.0.0.1:3000;
+    server [::1]:3000;
 }
 
 server {
@@ -526,7 +526,7 @@ changez les permissions d'accès au fichier :
 chmod 600 /etc/letsencrypt/cloudflare-api-token.ini
 ```
 
-Générez enfin votre certificat avec la commande suivante :
+Générez enfin votre certificat avec la commande suivante ([src.](https://certbot-dns-cloudflare.readthedocs.io/en/stable/)) :
 ```
 certbot certonly --dns-cloudflare --dns-cloudflare-credentials /etc/letsencrypt/cloudflare-api-token.ini -d chat.lghs.be
 ```
