@@ -40,7 +40,7 @@ La migration vers Mattermost doit donc se faire en 2 étapes :
 **Phase 2** :
 
 1. Migration des données (canaux, chats, threads, fichiers joints et émojis)
-2. Installation d'une nouvelle configuration oAuth sur Keycloak
+2. Installation d'une nouvelle configuration OAuth sur Keycloak
 3. Migration des bots vers Mattermost.
 
 
@@ -546,11 +546,11 @@ root@lghs-chat-prod:/srv/chat.lghs.be# systemctl restart nginx
 
 ## Upgrade vers 3.18.2
 
-Pour l'upgrade, il faut passer par chaque version majeure obligatoirement. ([src.](https://docs.rocket.chat/quick-start/upgrading-rocket.chat))
+Contrairement aux autres solutions de chatops disponibles plus robustes (ex.: Mattermost), Rocket.Chat requiert le passage par chaque version mineures (c'est-à-dire X.Y) pour effectuer une mise à jour, sinon on risque des soucis dans les migrations de schémas de bases de données. ne pas avoir de problèmes. Par la notation semver X.Y.Z, la documentation insinue même de passer par chaque version de patch ([src.](https://docs.rocket.chat/quick-start/upgrading-rocket.chat)).
 
-Passer à la dernière vesion de la branche 4.x ne fonctionne pas directement à cause d'étapes de schéma de migration qui ne sont plus présentes dans la version 4.
+Lors de nos tests, nous avons pu confirmer ce manque de robustesse, car passer directement de la 3.0.12 à la 3.18.2 ne fonctionne pas. Il semblerait que des étapes de migration de schéma de base de données ne soient plus présentes dans les dernnières versions de la branche 3.x. (Par la suite, nous nous sommes rendus compte que passer à la dernière version de la branche 4.x en étant sur la toute dernière version de la branche 3.18 ne fonctionne pas non plus.)
 
-Cependant, passer directement de la 3.0.12 à la 3.18.2 ne fonctionne pas non plus sans souci, car la migration de schéma de DB ne passe pas correctement au schéma de base de données version 231. Il faut pour ce faire désactiver temporairement les modules oAuth/SAML. La migration 231 correspond à une requête mongo relative au plugin oAuth :
+Pour le passage en 3.18, la migration de schéma de base de données ne passe pas correctement en version 231. Il a fallu pour ce faire désactiver temporairement les modules OAuth/SAML. En inspectant le code ([src.](https://github.com/RocketChat/Rocket.Chat/blob/4.5.7/server/startup/migrations/v231.ts#L17-L19)), la migration 231 correspond à une requête mongo relative au plugin OAuth :
 ```
 const query = {
     _id: { $in: [/^Accounts_OAuth_(Custom-)?([^-_]+)$/, 'Accounts_OAuth_GitHub_Enterprise'] },
@@ -558,16 +558,16 @@ const query = {
 };
 ```
 
-([src.](https://github.com/RocketChat/Rocket.Chat/blob/4.5.7/server/startup/migrations/v231.ts#L17-L19)) L'erreur semble connue. ([src.](https://github.com/RocketChat/Rocket.Chat/issues/27014))
+L'erreur est connue ([src.](https://github.com/RocketChat/Rocket.Chat/issues/27014)), mais pas corrigée.
 
-Considérons que RocketChat 3.0.12 est en cours d'exécution. Stoppons d'abord le conteneur Docker de Rocket.Chat tout en laissant Mongo tourner :
+Partons du princique que RocketChat 3.0.12 est en cours d'exécution. Stoppons d'abord le conteneur Docker de Rocket.Chat tout en laissant la base de données MongoDB tourner :
 ```
-docker stop chatlghsbe-rocketchat-1
+root@lghs-chat-prod:/srv/chat.lghs.be# docker stop chatlghsbe-rocketchat-1
 ```
 
-Désactivons temporairement le plugin de Rochet.Chat relative à l'auth oAuth :
+Désactivons temporairement le plugin de Rochet.Chat relatif au processus d'identification OAuth. Pour ce faire, entrez dans le conteneur Docker relatif à MongoDB, lancez le shell de Mongo et vérifions si la valeur qui nous intéresse est bien présente en base de données :
 ```
-root@lghs-chat-test:/srv/chat.lghs.be# docker exec -it chatlghsbe-mongo-1 /bin/bash
+root@lghs-chat-prod:/srv/chat.lghs.be# docker exec -it chatlghsbe-mongo-1 /bin/bash
 root@e80c9dfa0fb1:/# mongo
 rs0:PRIMARY> use rocketchat
 rs0:PRIMARY> var col = db.getCollection('rocketchat_settings')
@@ -600,7 +600,7 @@ rs0:PRIMARY> col.update({"_id" : "Accounts_OAuth_Custom-Authlghsbe"}, {$set: { "
 WriteResult({ "nMatched" : 1, "nUpserted" : 0, "nModified" : 1 })
 ```
 
-Il est ensuite nécessaire de tuer les index de Rocket.Chat, sinon les migration de schéma échoueront. Pour ce faire, toujours à partir du shell Mondo DB :
+Il est ensuite nécessaire de tuer les index de Rocket.Chat, sinon les migration sde schéma échoueront. Pour ce faire, toujours à partir du shell MongoDB :
 ```
 db.rocketchat_nps_vote.dropIndexes()
 db.users.dropIndexes()
@@ -612,22 +612,20 @@ db.rocketchat_apps_logs.dropIndexes()
 
 ([src.](https://forums.rocket.chat/t/upgrade-from-snap-3-18-to-4-8/14402/3))
 
-
-
 Quittons le shell Mongo et le conteneur mongo et stoppons le reste de l'environnement Docker :
 ```
-docker compose -f docker-compose-prod-3.0.12.yml down
+root@lghs-chat-prod:/srv/chat.lghs.be# docker compose -f docker-compose-prod-3.0.12.yml down
 ```
 
-Copions le fichier Docker Compose et changeons la version de Rocket.Chat :
+Copions le fichier Docker Compose et changeons la version de Rocket.Chat comme suit :
 ```
 cd /srv/chat.lghs.be
 cp docker-compose-prod-3.0.12.yml docker-compose-prod-3.18.2.yml
 ```
 
 ```
---- docker-compose-prod-3.0.12.yml      2022-12-23 04:21:11.315632271 +0000
-+++ docker-compose-prod-3.18.2.yml      2022-12-23 04:06:39.707945575 +0000
+--- docker-compose-prod-3.0.12.yml
++++ docker-compose-prod-3.18.2.yml
 @@ -2,7 +2,7 @@
  
  services:
@@ -641,12 +639,12 @@ cp docker-compose-prod-3.0.12.yml docker-compose-prod-3.18.2.yml
 ```
 
 ```
-docker compose -f docker-compose-prod-3.18.2.yml up -d
+root@lghs-chat-prod:/srv/chat.lghs.be# docker compose -f docker-compose-prod-3.18.2.yml up -d
 ```
 
-Une fois que `mongo-init-replica` est quitté, 20 secondes après, l'état de démarrage de Rocket.Chat peut être suivi avec :
+Une fois que `mongo-init-replica` est quitté, 20 secondes après, l'état de démarrage de Rocket.Chat peut être suivi avec la commande suivante. Dès qu'on voit la version de Rocket.Chat et la mention `SERVER RUNNING`, ça veut dire que tout est bon.
 ```
-$ docker logs -f chatlghsbe-rocketchat-1
+root@lghs-chat-prod:/srv/chat.lghs.be# docker logs -f chatlghsbe-rocketchat-1
 [...]
 ➔ System ➔ startup                                                                            
 ➔ +---------------------------------------------+                                    
@@ -667,11 +665,11 @@ $ docker logs -f chatlghsbe-rocketchat-1
 ➔ +---------------------------------------------+
 ```
 
-Une fois que le serveur a redémarré, on applique la même recette que précédemment. On coupe Rocket uniquement en laissant Mongo tourner et on réactive le plugin oAuth.
+Une fois que le serveur a redémarré, on applique la même recette que précédemment. On coupe Rocket uniquement en laissant Mongo tourner et on réactive le plugin OAuth.
 
 ```
-root@lghs-chat-test:/srv/chat.lghs.be# docker stop chatlghsbe-rocketchat-1
-root@lghs-chat-test:/srv/chat.lghs.be# docker exec -it chatlghsbe-mongo-1 /bin/bash
+root@lghs-chat-prod:/srv/chat.lghs.be# docker stop chatlghsbe-rocketchat-1
+root@lghs-chat-prod:/srv/chat.lghs.be# docker exec -it chatlghsbe-mongo-1 /bin/bash
 root@e80c9dfa0fb1:/# mongo
 rs0:PRIMARY> use rocketchat
 rs0:PRIMARY> var col = db.getCollection('rocketchat_settings')
@@ -826,7 +824,7 @@ Cependant, nous n'avons rien trouvé de tel en tentant de les lister.
 ```
 rs0:PRIMARY> db.getCollectionNames()
 ```
-[src.](https://www.mongodb.com/docs/manual/reference/command/listCollections/))
+([src.](https://www.mongodb.com/docs/manual/reference/command/listCollections/))
 
 
 ```
