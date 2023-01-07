@@ -854,16 +854,20 @@ rs0:PRIMARY> db.getCollectionNames()
 ([src.](https://www.mongodb.com/docs/manual/reference/command/listCollections/))
 
 
+Efface les données de configuration de cloud :
+
 ```
 db.rocketchat_settings.update({_id:/Cloud_.*/}, {$set:{value:""}},{multi:true})
 ```
 
+Mais la commande efface de trop, il faut réinitialiser la valeur de l'URL du serveur par défaut :
 
-## Upgrade vers 4.8.6
+```
+db.rocketchat_settings.update({_id:"Cloud_Url"},{$set: {value: "https://cloud.rocket.chat"}})
+```
 
-Pour le passage de la 3.18.2 à 4.8.6, exécuter les commandes précédentes jusqu'il n'y ait plus de souci de migration de schéma de base de données.
 
-## Upgrade vers 5.4.1
+## Upgrade vers 5.0.8
 
 On a obtenu la stack trace suivante :
 ```
@@ -895,55 +899,290 @@ ervers: Map(1) {                                                                
 [...]
 ```
 
+Ce problème est dû au fait que le conteneur Rocket.Chat n'arrive plus à résoudre correctement le nom d'hôte du conteneur MongoDB. Il suffit de corriger le nom d'hôte comme tel ([src.](https://github.com/RocketChat/Rocket.Chat/issues/26519#issuecomment-1218480192)) :
 ```
-config = rs.config()
-config.members[0].host = 'chatlghsbe-mongo-1:27017'
-rs.reconfig(config)
+root@lghs-chat-prod:/srv/chat.lghs.be# docker exec -it chatlghsbe-mongo-1 /bin/bash
+root@e80c9dfa0fb1:/# mongo
+rs0:PRIMARY> use rocketchat
+rs0:PRIMARY> config = rs.config()
+rs0:PRIMARY> config.members[0].host = 'chatlghsbe-mongo-1:27017'
+rs0:PRIMARY> rs.reconfig(config)
 ```
+
+Dans les logs de Rocket.Chat, nous remarquons pas mal d'erreur de fichiers introuvables de ce type :
+```
+root@lghs-chat-test:/srv/chat.lghs.be# docker logs -f chatlghsbe-rocketchat-1
+[...]
+{"level":30,"time":"2023-01-07T00:08:00.662Z","pid":10,"hostname":"0088c8f1c339","name":"SyncedCron","msg":"Finished \"Generate download files for user data\"."}
+Error: ENOENT: no such file or directory, open '/tmp/userData/57c69uirn6PMMwX9E/user.html'
+    at Object.openSync (fs.js:498:3)
+    at Object.writeFileSync (fs.js:1529:35)
+    at startFile (app/user-data-download/server/cronProcessDownloads.js:40:5)
+    at generateUserFile (app/user-data-download/server/cronProcessDownloads.js:492:2)
+    at app/user-data-download/server/cronProcessDownloads.js:559:4
+    at /app/bundle/programs/server/npm/node_modules/meteor/promise/node_modules/meteor-promise/fiber_pool.js:43:40 {
+  errno: -2,
+  syscall: 'open',
+  code: 'ENOENT',
+  path: '/tmp/userData/57c69uirn6PMMwX9E/user.html'
+}
+[...]
+```
+
+Ceci est dû au fait que des utilisateurs ont précédemment fait des demandes d'export de leurs données, mais que les fichiers ne sont plus accessibles. En effet, les demandes de ce types produisent des fichiers dans `/tmp`. Dans le cas où le serveur a dû redémarrer, `/tmp` n'étant pas persistant, les fichiers n'existent plus, mais Rocket.Chat en tient toujours compte. Vidons les tables appropriées. ([src.](https://github.com/RocketChat/Rocket.Chat/issues/12587#issuecomment-1109570101))
+
+
+```
+root@lghs-chat-prod:/srv/chat.lghs.be# docker exec -it chatlghsbe-mongo-1 /bin/bash
+root@e80c9dfa0fb1:/# mongo
+rs0:PRIMARY> use rocketchat
+rs0:PRIMARY> db.rocketchat_export_operations.find({}, {"userData.services.lghs.name":1,_id:0})
+{  }
+{  }
+{ "userData" : { "services" : { "lghs" : { "name" : "XXXXXXX" } } } }
+{ "userData" : { "services" : { "lghs" : { "name" : "XXXXXXX" } } } }
+rs0:PRIMARY> db.rocketchat_export_operations.find().pretty()
+[...]
+rs0:PRIMARY> db.rocketchat_export_operations.remove({})
+WriteResult({ "nRemoved" : 4 })
+rs0:PRIMARY> db.rocketchat_user_data_files.find().pretty()
+[...]
+rs0:PRIMARY> db.rocketchat_user_data_files.remove({})
+WriteResult({ "nRemoved" : 2 })
+```
+
 
 ([src.](https://github.com/RocketChat/Rocket.Chat/issues/26519#issuecomment-1218480192))
 
 
-La précédente version de la branche 4.x (la 4.8.6) indique que MongoDB version 4.2 est pris en charge. ([src.](https://github.com/RocketChat/Rocket.Chat/releases/tag/4.8.6)) Nous n'avons donc pas à mettre à jour la version de Mongo à présent.
-
-
-Crash lors de l'upgrade direct de la v. 3.0.12 à 4.8.6.
-
-Tentative de migratiob sur 4.0.0
-
-([src.](https://github.com/RocketChat/Rocket.Chat/releases/tag/4.0.0))
-
+Après la connexion, on remarque un gros avertissement dans la web UI mais également dans les logs serveur :
 ```
-cp docker-compose-prod-3.0.12.yml docker-compose-prod-4.0.0.yml
-```
-
-Your database migration failed:                                     |                                                                                                                    
-|  Start date cannot be later than expire date
-
-
-même erreur en 4.0
-
-https://github.com/RocketChat/Rocket.Chat/releases/tag/4.8.7
-
-
-
-Il a ensuite fallu délocker les migrations pour qu'elles puissent s'exécuter à nouveau :
-```
-rs0:PRIMARY> use rocketchat
-rs0:PRIMARY> db.migrations.update({"_id": "control"}, {$set:{locked: false}})
+[...]
++----------------------------------------------------------------------+
+|                              DEPRECATION                             |           
++----------------------------------------------------------------------+
+|                                                                      |
+|  YOUR CURRENT MONGODB VERSION (4.2.22) IS DEPRECATED.
+|  IT WILL NOT BE SUPPORTED ON ROCKET.CHAT VERSION 6.0.0 AND GREATER,  |
+|  PLEASE UPGRADE MONGODB TO VERSION 4.4 OR GREATER                    |
+|                                                                      |
++----------------------------------------------------------------------+
+[...]
 ```
 
+Le fait que MongoDB ne soit pas à jour n'est pas un problème. Même la toute dernière version de Rocket.Chat, la 5.4.1, (à l'heure où ces lignes sont écrites), indique prendre en charge MongoDB 4.2. ([src.](https://github.com/RocketChat/Rocket.Chat/releases/tag/5.4.1)) Nous mettrons à niveau MongoDB en version 5.0 tout à la fin de ce processus de mise à jour.
 
-([src.](https://github.com/RocketChat/Rocket.Chat/issues/15372))
+Dans les logs se trouvaient également de nombreuses erreur de connexion au serveur mail. Il semblerait que l'erreur vienne de Yulpa, l'hébergeur mail du LgHS. Après analyse, il existe de nombreux problèmes de configuration et de réputation email avec cette infra. Nous avons donc supprimé la configuration email de l'instance et l'avons fait pointer vers une adresse (`ne-pas-repondre@lghs.space`) qui utilise l'infrastructure email de La Mouette, très robuste avec un taux de réputation maximum. `lghs.be` et `liegehacker.space` étaient tous les 2 déjà configurés pour recevoir des emails sur Yulpa, `lghs.space` était le seul qui ne disposait pas de configuration email, c'était donc le parfait candidat.
 
+## Upgrade vers 5.1.5
+
+* Copiez le fichier de recette Docker Compose :
+  ```
+  root@lghs-chat-test:/srv/chat.lghs.be# cp docker-compose-prod-5.0.8.yml docker-compose-prod-5.1.5.yml
+  ```
+* Modifiez le fichier yml pour pointer vers l'image 5.1.5
+* Stoppez la stack en cours :
+  ```
+  root@lghs-chat-prod:/srv/chat.lghs.be# docker compose -f docker-compose-prod-5.0.8.yml down
+  ```
+* Lancez la nouvelle stack :
+  ```
+  root@lghs-chat-prod:/srv/chat.lghs.be# docker compose -f docker-compose-prod-5.1.5.yml up -d
+  ```
+* Pas de problème à signaler lors de la mise à niveau vers cette version.
+
+## Upgrade vers 5.1.2
+
+* Copiez le fichier de recette Docker Compose :
+  ```
+  root@lghs-chat-test:/srv/chat.lghs.be# cp docker-compose-prod-5.1.5.yml docker-compose-prod-5.2.1.yml
+  ```
+* Modifiez le fichier yml pour pointer vers l'image 5.2.1
+* Stoppez la stack en cours :
+  ```
+  root@lghs-chat-prod:/srv/chat.lghs.be# docker compose -f docker-compose-prod-5.1.5.yml down
+  ```
+* Lancez la nouvelle stack :
+  ```
+  root@lghs-chat-prod:/srv/chat.lghs.be# docker compose -f docker-compose-prod-5.2.1.yml up -d
+  ```
+* Pas de problème à signaler lors de la mise à niveau vers cette version.
+
+## Upgrade vers 5.3.5
+
+* Copiez le fichier de recette Docker Compose :
+  ```
+  root@lghs-chat-test:/srv/chat.lghs.be# cp docker-compose-prod-5.2.1.yml docker-compose-prod-5.3.5.yml
+  ```
+* Modifiez le fichier yml pour pointer vers l'image 5.3.5
+* Stoppez la stack en cours :
+  ```
+  root@lghs-chat-prod:/srv/chat.lghs.be# docker compose -f docker-compose-prod-5.2.1.yml down
+  ```
+* Lancez la nouvelle stack :
+  ```
+  root@lghs-chat-prod:/srv/chat.lghs.be# docker compose -f docker-compose-prod-5.3.5.yml up -d
+  ```
+* Pas de problème à signaler lors de la mise à niveau vers cette version.
+
+## Upgrade vers MongoDB 4.4.18
+
+Dumpez la base de données à partir du conteneur :
 
 ```
-{"line":"120","file":"migrations.js","message":"Migrations: Migrating from version 230 -> 232","time":{"$date":1671721103672},"level":"info"}
-{"line":"120","file":"migrations.js","message":"Migrations: Running up() on version 231","time":{"$date":1671721103675},"level":"info"}
-{"line":"120","file":"migrations.js","message":"Migrations: Running up() on version 232","time":{"$date":1671721103685},"level":"info"}
-{"line":"120","file":"migrations.js","message":"Migrations: Finished migrating.","time":{"$date":1671721103742},"level":"info"}
+root@lghs-chat-test:/srv/chat.lghs.be# docker exec -it chatlghsbe-mongo-1 /bin/bash
+root@d5bdf2fd45ea:/# cd /backups/
+root@d5bdf2fd45ea:/backups# mongodump
+[...]
 ```
 
+Stoppez la stack Docker :
+```
+root@lghs-chat-test:/srv/chat.lghs.be# docker compose -f docker-compose-prod-5.3.5.yml down
+```
+
+Supprimez les fichiers de la base de données :
+```
+root@lghs-chat-test:/srv/chat.lghs.be# rm -r data/db
+```
+
+Adapter le fichier de recette Docker Compose comme tel, en laissant bien Rocket.Chat commenté :
+```
+docker-compose-prod-5.3.5-mongodb-4.4.18.yml
+```
+```
+version: "3.9"
+
+services:
+  #  rocketchat:
+  #    image: rocketchat/rocket.chat:5.3.5
+  #    command: >
+  #      bash -c
+  #        "for i in `seq 1 30`; do
+  #          node main.js &&
+  #          s=$$? && break || s=$$?;
+  #          echo \"Tried $$i times. Waiting 5 secs...\";
+  #          sleep 5;
+  #        done; (exit $$s)"
+  #    restart: unless-stopped
+  #    volumes:
+  #      - "/srv/chat.lghs.be/data/www:/app/uploads/"
+  #    environment:
+  #      - PORT=3000
+  #        #- ROOT_URL=http://localhost:3000
+  #      - ROOT_URL=https://chat.lghs.be
+  #      - MONGO_URL=mongodb://mongo:27017/rocketchat
+  #      - MONGO_OPLOG_URL=mongodb://mongo:27017/local
+  #    depends_on:
+  #      - mongo
+  #    ports:
+  #      - 3000:3000
+
+  mongo:
+    image: mongo:4.4.18
+    restart: unless-stopped
+    volumes:
+     # - ./data/db:/data/db
+     - "/srv/chat.lghs.be/data/db:/data/db/"
+     - "/srv/chat.lghs.be/backups:/backups/"
+    # --smallfiles not supported with mongo 4.2
+    # --storageEngine=mmapv1 deprecated in mongo 4.2
+    #command: mongod --smallfiles --oplogSize 128 --replSet rs0 --storageEngine=mmapv1
+    #command: mongod --oplogSize 128 --replSet rs0 --storageEngine=mmapv1
+    command: mongod --oplogSize 128 --replSet rs0
+
+  # this container's job is just run the command to initialize the replica set.
+  # it will run the command and remove himself (it will not stay running)
+  mongo-init-replica:
+    image: mongo:4.4.18
+    command: >
+      bash -c
+        "for i in `seq 1 30`; do
+          mongo mongo/rocketchat --eval \"
+            rs.initiate({
+              _id: 'rs0',
+              members: [ { _id: 0, host: 'chatlghsbe-mongo-1:27017' } ]})\" &&
+          s=$$? && break || s=$$?;
+          echo \"Tried $$i times. Waiting 5 secs...\";
+          sleep 5;
+        done; (exit $$s)"
+    depends_on:
+      - mongo
+```
+
+Lancez la stack MongoDB 4.4.18 :
+```
+root@lghs-chat-test:/srv/chat.lghs.be# docker compose -f docker-compose-prod-5.3.5-mongodb-4.4.18.yml up -d
+```
+
+Importez le backup de base de données et attendez bien la fin de la recréation dex index :
+```
+root@lghs-chat-test:/srv/chat.lghs.be# docker exec -it chatlghsbe-mongo-1 /bin/bash
+root@d5bdf2fd45ea:/# cd /backups/
+root@d5bdf2fd45ea:/backups# mongorestore --drop  dump/
+[...]
+2023-01-07T04:39:04.132+0000    index: &idx.IndexDocument{Options:primitive.M{"name":"intendedAt_1_name_1", "ns":"rocketchat.rocketchat_cron_history", "unique":true, "v":2}, Key:primitive.D{primitive.E{Key:"intendedAt", Value:1}, primitive.E{Key:"name"
+, Value:1}}, PartialFilterExpression:primitive.D(nil)}
+2023-01-07T04:39:04.133+0000    index: &idx.IndexDocument{Options:primitive.M{"expireAfterSeconds":172800, "name":"startedAt_1", "ns":"rocketchat.rocketchat_cron_history", "v":2}, Key:primitive.D{primitive.E{Key:"startedAt", Value:1}}, PartialFilterExp
+ression:primitive.D(nil)}
+2023-01-07T04:39:04.191+0000    no indexes to restore for collection config.image_collection
+2023-01-07T04:39:07.937+0000    569939 document(s) restored successfully. 0 document(s) failed to restore.
+```
+
+Une fois importé, laissez tourner quelques minutes le temps que les index se réimportent.
+
+Une fois les ressorces systèmes revenues à un état normal, vérifiez bien que les fonctionnalités de la base de données sont bien définies sur le jeu 4.4 et regardez aussi la sortie de `rs.status()` si vous ne voyez pas des éléments qui seraient étranges :
+```
+root@lghs-chat-prod:/srv/chat.lghs.be# docker exec -it chatlghsbe-mongo-1 /bin/bash
+root@700faf1b06cb:/# mongo
+rs0:PRIMARY> db.adminCommand( { getParameter: 1, featureCompatibilityVersion: 1 } )
+{
+        "featureCompatibilityVersion" : {
+                "version" : "4.4"
+        },
+        "ok" : 1,
+        "$clusterTime" : {
+                "clusterTime" : Timestamp(1673066756, 1),
+                "signature" : {
+                        "hash" : BinData(0,"AAAAAAAAAAAAAAAAAAAAAAAAAAA="),
+                        "keyId" : NumberLong(0)
+                }
+        },
+        "operationTime" : Timestamp(1673066756, 1)
+}
+rs0:PRIMARY> rs.status()
+```
+
+Si tout est bon, stoppez la stack :
+```
+root@lghs-chat-test:/srv/chat.lghs.be# docker compose -f docker-compose-prod-5.3.5-mongodb-4.4.18.yml down
+```
+
+**Décommentez** le service relatif Rocket.Chat de la recette Docker Compose et relancez la stack :
+```
+root@lghs-chat-test:/srv/chat.lghs.be# docker compose -f docker-compose-prod-5.3.5-mongodb-4.4.18.yml up -d
+```
+
+Assurez-vous que Rocket.Chat fonctionne bien et qu'il détecte bien le nouveau moteur MongoDB.
+
+Enfin, supprimez l'export des données :
+```
+root@lghs-chat-test:/srv/chat.lghs.be# rm -r backups/dump*
+```
+
+## Upgrade vers MongoDB 5.0.14
+
+Réitérez exactement les mêmes instructions que lors de l'upgrade vers la version 4.4.18 de MongoDB.
+
+Changez juste les valeurs 4.4.18 par 5.0.14.
+
+## Upgrade vers 5.4.1
+
+NE FONCTIONNE PAS pour l'instant.
+
+Le site charge dans le vide sans raison.
+
+Il existe également un problème rapporté dans l'app mobile avec les serveurs 5.4.0 et 5.4.1 : les utilisateurs utilisant un SSO (notre cas) ne savent plus se connecter une fois leur jeton d'accès expiré. Un correctif est en cours de publication. ([src.](https://github.com/RocketChat/Rocket.Chat.ReactNative/pull/4783))
 
 ## Versions prises en charge
 
