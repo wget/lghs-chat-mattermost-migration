@@ -770,6 +770,33 @@ Ici, comme notre instance ne dispose que d'un volume, vous allons simplement cr�
 
 15. Vous disposez dès à présent d'une machine clone de la production. Suivez ensuite les étapes comme décrit dans la procédure du chapitre précédent `Déploiement d'une nouvelle machine`, à partir de l'étape 22 pour savoir comment attribuer un sous-domaine `lghs-chat-test.lghs.space` pointant sur cette machine de test.
 
+## Upgrade vers 4.8.6
+
+Pour le passage de la 3.18.2 à 4.8.6, exécuter les commandes précédentes jusqu'il n'y ait plus de souci de migration de schéma de base de données.
+
+
+```
+cp docker-compose-prod-3.0.12.yml docker-compose-prod-4.0.0.yml
+```
+
+
+Il a ensuite fallu délocker les migrations pour qu'elles puissent s'exécuter à nouveau :
+```
+rs0:PRIMARY> use rocketchat
+rs0:PRIMARY> db.migrations.update({"_id": "control"}, {$set:{locked: false}})
+```
+
+
+([src.](https://github.com/RocketChat/Rocket.Chat/issues/15372))
+
+
+```
+{"line":"120","file":"migrations.js","message":"Migrations: Migrating from version 230 -> 232","time":{"$date":1671721103672},"level":"info"}
+{"line":"120","file":"migrations.js","message":"Migrations: Running up() on version 231","time":{"$date":1671721103675},"level":"info"}
+{"line":"120","file":"migrations.js","message":"Migrations: Running up() on version 232","time":{"$date":1671721103685},"level":"info"}
+{"line":"120","file":"migrations.js","message":"Migrations: Finished migrating.","time":{"$date":1671721103742},"level":"info"}
+```
+
 
 ## Réactivation des notifications push
 
