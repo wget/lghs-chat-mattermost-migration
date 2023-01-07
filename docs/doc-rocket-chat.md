@@ -546,9 +546,9 @@ root@lghs-chat-prod:/srv/chat.lghs.be# systemctl restart nginx
 
 ## Upgrade vers 3.18.2
 
-Contrairement aux autres solutions de chatops disponibles plus robustes (ex.: Mattermost), Rocket.Chat requiert le passage par chaque version mineures (c'est-à-dire X.Y) pour effectuer une mise à jour, sinon on risque des soucis dans les migrations de schémas de bases de données. ne pas avoir de problèmes. Par la notation semver X.Y.Z, la documentation insinue même de passer par chaque version de patch ([src.](https://docs.rocket.chat/quick-start/upgrading-rocket.chat)).
+Contrairement aux autres solutions de chatops disponibles plus robustes (ex.: Mattermost), Rocket.Chat requiert le passage par chaque version mineures (c'est-à-dire X.Y) pour effectuer une mise à jour, sinon on risque des soucis dans les migrations de schémas de bases de données. Par la notation semver X.Y.Z, la documentation insinue même de passer par chaque version de patch ([src.](https://docs.rocket.chat/quick-start/upgrading-rocket.chat)).
 
-Lors de nos tests, nous avons pu confirmer ce manque de robustesse, car passer directement de la 3.0.12 à la 3.18.2 ne fonctionne pas. Il semblerait que des étapes de migration de schéma de base de données ne soient plus présentes dans les dernnières versions de la branche 3.x. (Par la suite, nous nous sommes rendus compte que passer à la dernière version de la branche 4.x en étant sur la toute dernière version de la branche 3.18 ne fonctionne pas non plus.)
+Lors de nos tests, nous avons pu confirmer ce manque de robustesse, car passer directement de la 3.0.12 à la 3.18.2 ne fonctionne pas. Il semblerait que des étapes de migration de schéma de base de données ne soient plus présentes dans les dernières versions de la branche 3.x. (Par la suite, nous nous sommes rendus compte que passer à la dernière version de la branche 4.x en étant sur la toute dernière version de la branche 3.18 ne fonctionne pas non plus.)
 
 Pour le passage en 3.18, la migration de schéma de base de données ne passe pas correctement en version 231. Il a fallu pour ce faire désactiver temporairement les modules OAuth/SAML. En inspectant le code ([src.](https://github.com/RocketChat/Rocket.Chat/blob/4.5.7/server/startup/migrations/v231.ts#L17-L19)), la migration 231 correspond à une requête mongo relative au plugin OAuth :
 ```
@@ -560,7 +560,7 @@ const query = {
 
 L'erreur est connue ([src.](https://github.com/RocketChat/Rocket.Chat/issues/27014)), mais pas corrigée.
 
-Partons du princique que RocketChat 3.0.12 est en cours d'exécution. Stoppons d'abord le conteneur Docker de Rocket.Chat tout en laissant la base de données MongoDB tourner :
+Partons du principe que RocketChat 3.0.12 est en cours d'exécution. Stoppons d'abord le conteneur Docker de Rocket.Chat tout en laissant la base de données MongoDB tourner :
 ```
 root@lghs-chat-prod:/srv/chat.lghs.be# docker stop chatlghsbe-rocketchat-1
 ```
@@ -600,7 +600,7 @@ rs0:PRIMARY> col.update({"_id" : "Accounts_OAuth_Custom-Authlghsbe"}, {$set: { "
 WriteResult({ "nMatched" : 1, "nUpserted" : 0, "nModified" : 1 })
 ```
 
-Il est ensuite nécessaire de tuer les index de Rocket.Chat, sinon les migration sde schéma échoueront. Pour ce faire, toujours à partir du shell MongoDB :
+Il est ensuite nécessaire de tuer les index de Rocket.Chat, sinon les migrations de schéma échoueront. Pour ce faire, toujours à partir du shell MongoDB :
 ```
 db.rocketchat_nps_vote.dropIndexes()
 db.users.dropIndexes()
@@ -692,23 +692,23 @@ Le jargon utilisé par Scaleway est assez spécifique.
 
 * Un volume représente l'espace de stockage d'une instance ([src.](https://www.scaleway.com/en/docs/compute/instances/concepts/#volumes)). Il y a 2 types de volumes :
 
-   * les volumes locaux qui sont hébergés sur le même hyperviseur local où tourne l'instance, ils sont de taille fixe et cette dernière dépent du type d'instance choisi.
+   * les volumes locaux qui sont hébergés sur le même hyperviseur local où tourne l'instance, ils sont de taille fixe et cette dernière dépend du type d'instance choisi.
 
    * les volumes de type bloc qui sont des espaces réseaux virtuels qui peuvent être attachés/détachés d'une instance. Les volumes de type bloc sont généralement utilisés pour augmenter la taille d'une instance.
 
-* Un snapshot est la fonctionnalité qui permet de créer une image d'un volume spécifique d'une instance. Comme les snapshots sont des copies de disque et dès lors occupent la même place que ces derniers, ils sont facturés au tarif en vigueur. ([src.](https://www.scaleway.com/en/docs/compute/instances/how-to/create-a-snapshot/))
+* Un snapshot est la fonctionnalité qui permet de créer une image d'un volume spécifique d'une instance. Comme les snapshots sont des copies de disque et, dès lors, occupent la même place que ces derniers, ils sont facturés au tarif en vigueur. ([src.](https://www.scaleway.com/en/docs/compute/instances/how-to/create-a-snapshot/))
 
   Il existe 3 types de snapshots :
 
   * Les LSSD (Local storage) qui sont créés à partir de volumes locaux. Ils peuvent être uniquement convertis en volumes locaux.
   * Les BSSD (Block storage) qui sont créés à partir de volumes de type bloc. Ils peuvent être uniquement convertis en volumes de type bloc.
-  * Les Unified qui sont créés à partir de volumes locaux ou de type bloc. Ils peuvent être convertis au choix, en volumes locaux ou en volumes de type bloc.
+  * Les Unified qui sont créés à partir de volumes locaux ou de type bloc. Ils peuvent être convertis, au choix, en volumes locaux ou en volumes de type bloc.
 
-* Une image est la fonctionnalité qui permet de créer une image complète de l'instance, en ce y compris des volumes. La fonctionnalité d'image fait donc appel aux snapshots de façon sous-jacente. Les images sont gratuites, mais créer une image crée automatiquement des snapshots de disques, qui eux restent bel et bien payants.
+* Une image est la fonctionnalité qui permet de créer une image complète de l'instance, en ce, y compris, des volumes. La fonctionnalité d'image fait donc appel aux snapshots de façon sous-jacente. Les images sont gratuites, mais créer une image crée automatiquement des snapshots de disques qui, eux, restent bel et bien payants. ([src.](https://www.scaleway.com/en/docs/compute/instances/how-to/create-a-backup/))
 
-Ici, comme notre instance ne dispose que d'un volume, vous allons simplement créer une image, sauvegarder tout est suffisant.
+Ici, comme notre instance ne dispose que d'un volume, vous allons simplement créer une image qui créera notre snapshot automatiquement ([src.](https://www.scaleway.com/en/docs/compute/instances/how-to/create-image-from-snapshot/)). Sauvegarder tout est suffisant.
 
-1. Assurez-vous d'être dans le bon projet (`lghs`), sélectionnez `Instances` et puis la machine à sauvegarder.
+1. Assurez-vous d'être dans le bon projet (`lghs`), sélectionnez `Instances` et puis la machine à sauvegarder, ici `lghs-chat-prod`.
 
    ![](img/doc-rocket-chat-scaleway-machine-backup-0001.png)
 
@@ -720,15 +720,15 @@ Ici, comme notre instance ne dispose que d'un volume, vous allons simplement cr�
 
    ![](img/doc-rocket-chat-scaleway-machine-backup-0003.png)
 
-   Notez que s'il existe déjà une image pour votre instance, le bouton est situé plus en haut, à droite de la liste :
+   Notez que s'il existe déjà une image pour votre instance, le bouton est alors situé plus en haut, à droite de la liste des snapshots :
 
    ![](img/doc-rocket-chat-scaleway-machine-backup-0003-existing.png)
 
-4. Sélectionnez le type d'image standard (les volumes `unified` décrit plus haut sont en effet beaucoup plus chers) et cliquez sur le bouton `Create an image from the instance` :
+4. Sélectionnez le type d'image standard (les volumes `unified` décrits plus haut sont en effet beaucoup plus chers, ils sont donc à éviter, d'autant qu'ils ne sont pas utiles ici) et cliquez sur le bouton `Create an image from the instance` :
 
    ![](img/doc-rocket-chat-scaleway-machine-backup-0004.png)
 
-5. Attendez que le point bleuclignant passe au vert fixe pour pouvoir continuer :
+5. Attendez que le point bleu clignotant passe au vert fixe pour pouvoir continuer :
 
    ![](img/doc-rocket-chat-scaleway-machine-backup-0005.png)
 
@@ -744,7 +744,7 @@ Ici, comme notre instance ne dispose que d'un volume, vous allons simplement cr�
 
    ![](img/doc-rocket-chat-scaleway-machine-backup-0008.png)
 
-9. Assurez-vous que l'image que vous venez de créer est toujours bien sélectionnée (`My Images` puis le nom de l'image précédemment créée). Il se peut en effet que àça ne soit plus le cas si vous avez sélectionné une machine plus petite malgré l'avertissement affiché.
+9. Assurez-vous que l'image que vous venez de créer est toujours bien sélectionnée (`My Images` puis le nom de l'image précédemment créée). Il se peut en effet que ça ne soit plus le cas si vous avez sélectionné une machine de taille plus petite malgré l'avertissement affiché.
 
    ![](img/doc-rocket-chat-scaleway-machine-backup-0009.png)
 
@@ -764,11 +764,11 @@ Ici, comme notre instance ne dispose que d'un volume, vous allons simplement cr�
 
     ![](img/doc-rocket-chat-scaleway-machine-backup-0013.png)
 
-14. Attendez que l'instance se crèe :
+14. Attendez que l'instance se crée :
 
     ![](img/doc-rocket-chat-scaleway-machine-backup-0014.png)
 
-15. Vous disposez dès à présent d'une machine clone de la production. Suivez ensuite les étapes comme décrit dans la procédure du chapitre précédent `Déploiement d'une nouvelle machine`, à partir de l'étape 22 pour savoir comment attribuer un sous-domaine `lghs-chat-test.lghs.space`.
+15. Vous disposez dès à présent d'une machine clone de la production. Suivez ensuite les étapes comme décrit dans la procédure du chapitre précédent `Déploiement d'une nouvelle machine`, à partir de l'étape 22 pour savoir comment attribuer un sous-domaine `lghs-chat-test.lghs.space` pointant sur cette machine de test.
 
 
 ## Réactivation des notifications push
