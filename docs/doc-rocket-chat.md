@@ -770,6 +770,22 @@ Ici, comme notre instance ne dispose que d'un volume, vous allons simplement cr�
 
 15. Vous disposez dès à présent d'une machine clone de la production. Suivez ensuite les étapes comme décrit dans la procédure du chapitre précédent `Déploiement d'une nouvelle machine`, à partir de l'étape 22 pour savoir comment attribuer un sous-domaine `lghs-chat-test.lghs.space` pointant sur cette machine de test.
 
+16. Etant donné que la version de production de Rocket.Chat pointe sur une instance Keycloak comme moyen d'authentification OAuth et que cette dernière ne pointe pas vers `lghs-chat-test.lghs.space`, il est nécessaire de réactiver la méthode de connexion par mot de passe pour pouvoir se connecter à l'instance Rocket.Chat et pouvoir tester l'instance à chaque étape de migration avant de répliquer les étapes en production. Pour réactiver la méthode d'authentification par mot de passe :
+    ```
+    rs0:PRIMARY> use rocketchat
+    switched to db rocketchat
+    rs0:PRIMARY> db.rocketchat_settings.update({"_id" : "Accounts_ShowFormLogin"}, {$set: { "value" : true }})
+    WriteResult({ "nMatched" : 1, "nUpserted" : 0, "nModified" : 1 })
+    ```
+
+    Il reste ensuite à définir un mot de passe pour un compte administrateur. Ici on définit le mot de passe `12345` de l'utilisateur nommé `wget` :
+    ```
+    db.users.update({username:"wget"}, { $set: {"services" : { "password" : {"bcrypt" : "$2a$10$n9CM8OgInDlwpvjLKLPML.eizXIzLlRtgCh3GRLafOdR9ldAUh/KG" } } } })
+    ```
+
+    ([src.](https://docs.rocket.chat/setup-and-configure-rocket.chat/advanced-workspace-management/restoring-an-admin#updating-the-admin-password))
+
+
 ## Upgrade vers 4.8.6
 
 Pour le passage de la 3.18.2 à 4.8.6, exécuter les commandes précédentes jusqu'il n'y ait plus de souci de migration de schéma de base de données.
