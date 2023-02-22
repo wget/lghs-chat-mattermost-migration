@@ -1068,7 +1068,39 @@ Après la connexion, on remarque un gros avertissement dans la web UI mais égal
 
 Le fait que MongoDB ne soit pas à jour n'est pas un problème. Même la toute dernière version de Rocket.Chat, la 5.4.1, (à l'heure où ces lignes sont écrites), indique prendre en charge MongoDB 4.2. ([src.](https://github.com/RocketChat/Rocket.Chat/releases/tag/5.4.1)) Nous mettrons à niveau MongoDB en version 5.0 tout à la fin de ce processus de mise à jour.
 
-Dans les logs se trouvaient également de nombreuses erreur de connexion au serveur mail. Il semblerait que l'erreur vienne de Yulpa, l'hébergeur mail du LgHS. Après analyse, il existe de nombreux problèmes de configuration et de réputation email avec cette infra. Nous avons donc supprimé la configuration email de l'instance et l'avons fait pointer vers une adresse (`ne-pas-repondre@lghs.space`) qui utilise l'infrastructure email de La Mouette, très robuste avec un taux de réputation maximum. `lghs.be` et `liegehacker.space` étaient tous les 2 déjà configurés pour recevoir des emails sur Yulpa, `lghs.space` était le seul qui ne disposait pas de configuration email, c'était donc le parfait candidat.
+## Configuration des échanges email
+
+En étudiant les logs à la recherche de problèmes résiduels, nous nous sommes rendus compte que l'instance Rocket.Chat n'arrivait plus à s'authentifier au serveur mail utilisé par le Liege HackerSpace. Dans les logs se trouvaient en effet de nombreuses erreurs de connexion au serveur mail.
+
+Ce dernier, hébergé chez Yulpa, ne bénéficie plus d'un niveau de sécurité suffisant si bien que les bibliothèques email utilisées par Rocket.Chat refusaient l'authentification. Après analyse, il existe en effet de nombreux problèmes de configuration et de réputation email avec cette infra.
+
+Nous avons donc supprimé la configuration email de l'instance et l'avons fait pointer vers une adresse (`ne-pas-repondre@lghs.space`) qui utilise l'infrastructure email de La Mouette (cf. [documentation de l'infra de La Mouette](https://docs.lamouette.org)), très robuste avec un taux de réputation maximum.
+
+`lghs.be` et `liegehacker.space` étaient tous les 2 déjà configurés pour recevoir des emails sur Yulpa, `lghs.space` était le seul qui ne disposait pas de configuration email, c'était donc le parfait candidat.
+
+Voici la façon dont nous avons procédé pour changer la configuration email au sein de Rocket.Chat.
+
+1. Allez dans le panneau d'administration.
+
+   ![](img/doc-rocket-chat-mail-config-0001.png)
+
+2. Cliquez sur `Paramètres` dans la barre latérale de gauche et recherchez le paramètre `E-mail` dans la partie de droite. Une fois trouvé, cliqué sur le bouton (erronément traduit) `Ouvert`.
+
+   ![](img/doc-rocket-chat-mail-config-0002.png)
+
+3. Dépliez le menu `Réponse directe`.
+
+   ![](img/doc-rocket-chat-mail-config-0003.png)
+
+4. Cliquez sur le bouton `Réinitialiser les paramètres par défaut de la section` et cliquez sur le bouton `Sauvegarder les modifications`. Ceci a pour effet de **supprimer** la possibilité de répondre à un fil de discussion de Rocket.Chat directement par email (avec cette fonctionnalité active, la réponse à l'email de notification apparaît alors dans le chat).
+
+   ![](img/doc-rocket-chat-mail-config-0004.png)
+
+5. Faites défiler la page vers le bas jusqu'à atteindre la section`SMTP`, dépliez-la, changez les paramètres comme suit, cliquez ensuite sur le bouton `Sauvegarder les modifications`. Terminez enfin par tester la configuration en cliquant sur le bouton `Envoyer un e-mail de test à mon utilisateur`.
+
+   ![](img/doc-rocket-chat-mail-config-0005.png)
+
+   Le mot de passe du compte se trouve dans le gestionnaire de mot de passe. Comme son nom l'indique (`ne-pas-repondre@`), il s'agit d'une adresse email à partir de laquelle il n'est possible que d'envoyer des messages (pas de compte IMAP pour la réception donc).
 
 ## Upgrade vers 5.1.5
 
