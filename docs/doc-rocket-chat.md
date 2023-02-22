@@ -861,7 +861,7 @@ Une fois les paramètres réinitialisés, il suffit de suivre la méthode expliq
 
    ![](img/doc-rocket-chat-reenable-push-notifications-0002.png)
 
-3. Retournez dans l'instance Rocket.Chat, cliquez sur le menu hamburger et sur le sous-menu `Workspace` :
+3. Retournez dans l'instance Rocket.Chat, cliquez sur l'icône représentant votre photo de profil dans la barre latérale de gauche et cliquez sur le sous-menu `Administration` :
 
    ![](img/doc-rocket-chat-reenable-push-notifications-0003.png)
 
@@ -878,7 +878,7 @@ Une fois les paramètres réinitialisés, il suffit de suivre la méthode expliq
    {"level":50,"time":"2023-01-25T12:51:49.174Z","pid":9,"hostname":"e0c33ac68892","name":"System","msg":"Failed to sync with Rocket.Chat Cloud","err":{"type":"Error","message":"failed [400]","stack":"Error: failed [400]\n    at makeErrorByStatus (server/lib/http/call.ts:59:9)\n    at server/lib/http/call.ts:168:19\n    at /app/bundle/programs/server/npm/node_modules/meteor/promise/node_modules/meteor-promise/fiber_pool.js:43:40","response":{"statusCode":400,"content":"","headers":{"access-control-allow-headers":"Content-Type, Authorization, Content-Length, Last-Event-ID, X-Requested-With","access-control-allow-methods":"GET, PUT, POST, DELETE, OPTIONS","access-control-allow-origin":"*","access-control-expose-headers":"Content-Type, Authorization, Cache-Control, Expires, Pragma, X-powered-by","cache-control":"private, no-cache, no-store, must-revalidate","connection":"close","content-length":"0","date":"Wed, 25 Jan 2023 12:51:49 GMT","expires":"-1","pragma":"no-cache","vary":"Accept-Encoding","x-fleet-version":"-783de2c","x-powered-by":"Rocket Fuel and Rocketeers"},"ok":false,"data":null}},"msg":"failed [400]"}
    ```
 
-6. Retournez sur le site du cloud Rocket (`https://cloud.rocket.chat`). VL'instance devrait désormais être visible. Cliquez sur le bouton `Apply Trial` en regard de l'instance dans la liste pour demander une version d'essai :
+6. Retournez sur le site du cloud Rocket (`https://cloud.rocket.chat`). L'instance devrait désormais être visible. Cliquez sur le bouton `Apply Trial` en regard de l'instance dans la liste pour demander une version d'essai :
 
    ![](img/doc-rocket-chat-reenable-push-notifications-0006.png)
 
