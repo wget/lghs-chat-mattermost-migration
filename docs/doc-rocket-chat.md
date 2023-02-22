@@ -902,6 +902,63 @@ Une fois les paramètres réinitialisés, il suffit de suivre la méthode expliq
 
 11. Vous allez être redirigé vers la page précédente sur l'instance Rocket.
 
+12. Maintenant que l'instance Rocket.Chat est reconnectée au Connectivity Services, il est nécessaire de réinitialiser les paramètres relatifs aux notifications. Allez dans les paramètres d'administration (cf. captures précédentes), puis allez dans `Push`, et cliquez *dans l'ordre* sur `Activer la passerelle` et `Activer`, puis sur le bouton `Sauvegarder les modifications`.
+
+    ![](img/doc-rocket-chat-reenable-push-notifications-0011.png)
+
+13. Toujours dans le panneau d'administration, allez cette fois dans `Assistant de configuration`, si ce n'est pas déjà le cas, dépliez la section `Informations sur le cloud`, cliquez sur le bouton `Réinitialiser les paramètres de la section` et cliquez sur le bouton `Sauvegarder les modifications`.
+
+    ![](img/doc-rocket-chat-reenable-push-notifications-0012.png)
+
+14. Sur la même page, dépliez la section juste en dessous `Informations sur l'organisation` et faites défiler la page vers le bas.
+
+    ![](img/doc-rocket-chat-reenable-push-notifications-0013.png)
+
+
+15. Cliquez alors sur le bouton `Réinitialiser les paramètres de la section` et cliquez sur le bouton `Sauvegarder les modifications`.
+
+    ![](img/doc-rocket-chat-reenable-push-notifications-0014.png)
+
+16. Redémarrez le serveur.
+
+    ```
+    root@lghs-chat-prod:/srv/chat.lghs.be# docker compose -f docker-compose-prod-4.8.6.yml down
+    [...]
+    root@lghs-chat-prod:/srv/chat.lghs.be# docker compose -f docker-compose-prod-4.8.6.yml up -d
+    ```
+
+17. Réactivons les paramètres dans l'ordre inverse. Toujours dans la peanneau d'administraion, allez dans `Assistant de configuration`, dépliquez `Informations sur l'organisation` et remplissez les informations comme suit :
+
+    ![](img/doc-rocket-chat-reenable-push-notifications-0015.png)
+
+18. Faites défiller la page vers le bas, continuez de remplir les informations comme suit et terminez en cliquant sur le bouton `Sauvegarder les modifications`.
+
+    ![](img/doc-rocket-chat-reenable-push-notifications-0016.png)
+
+19. Toujours dans le panneau d'administration, toujours dans la même partie `Assistant de configuration`, dépliez la section `Informations sur le cloud` et activez le paramètre `Accord sur les conditions de confidentialité du service cloud`.
+
+    ![](img/doc-rocket-chat-reenable-push-notifications-0017.png)
+
+20. Vous pouvez maintenant cliquer sur le bouton `Sauvegarder les modifications`.
+
+    ![](img/doc-rocket-chat-reenable-push-notifications-0018.png)
+
+21. Toujours dans les paramètres d'administration, allez dans `Push`, et activez *dans l'ordre* `Activer`, puis `Activer la passerelle`, vérifiez que la passerelle indique toujours `https://gateway.rocket.chat` sinon rajoutez la et cliquez sur le bouton `Sauvegarder les modifications`.
+
+    ![](img/doc-rocket-chat-reenable-push-notifications-0019.png)
+
+22. Redémarrez le serveur.
+
+    ```
+    root@lghs-chat-prod:/srv/chat.lghs.be# docker compose -f docker-compose-prod-4.8.6.yml down
+    [...]
+    root@lghs-chat-prod:/srv/chat.lghs.be# docker compose -f docker-compose-prod-4.8.6.yml up -d
+    ```
+
+En cliquant sur le bouton de test pour générer une notification sur les périphériques mobiles, on obtenait un message d'erreur indiquant qu'il n'y avait pas de jeton pour l'utilisateur en cours. Pour pallier ce problème, nous avons juste dû ous déconnecter de l'app mobile et nous reconnecter. Appuyer sur le bouton de test a alors fonctionné avec un toast indiquant que l'action s'était bien passée, mais nous ne recevions quand même pas la notification sur le mobile.
+
+
+https://forums.rocket.chat/t/unable-to-send-push-notifications-there-are-no-tokens-for-this-user/12285
 
 
 ## Upgrade vers 5.0.8
