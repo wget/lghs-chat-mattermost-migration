@@ -816,71 +816,92 @@ rs0:PRIMARY> db.migrations.update({"_id": "control"}, {$set:{locked: false}})
 
 ## Réactivation des notifications push
 
-cf. screenshots
+Étant sur une 4.8.6, nous disposons maintenant d'une version suffisamment récente que pour permettre la réactivation des notifications push qui dépendent des Connectiviy Services. Ces derniers nécessitent (à l'heure où ces lignes sont écrites - décembre 2022 -) a minima une branche 4.x de Rocket.Chat pour pouvoir être utilisés. ([src.](https://docs.rocket.chat/rocket.chat-resources/getting-support/enterprise-support#rocket.chat-services))
 
+Pour rappel, depuis un changement de politique récent de la part de Rocket.Chat, il est désormais nécessaire d'obtenir une licence Entreprise pour avoir les notifications push sur mobile. Du moins, l'offre Community, gratuite, est limitée à 10 000 notifications, mais une utilisation de base pour le Liege HackerSpace nécessite au minimum un quota entre 30 et 40 000 par mois (d'après les statistiques d'utilisation réalisées).
 
+Le principe de base est de réenregistrer l'instance à ces Connectivity Services. Durant nos tests, nous nous sommes toutefois heurtés à des complications. La procédure ne semblait pas fonctionner via l'interface graphique ([src.](https://docs.rocket.chat/guides/administration/admin-panel/settings/push-notifications-admin-guide)). En effet, malgré la nouvelle passerelle enregistrée correctement et les nouvelles CGU acceptées, lorsqu'on tentait de se connecter avec l'ancien compte lié au Connectivity Services, et qu'on recliquait pour établir une nouvelle connexion avec le nouveau compte, Rocket réutilisait les anciens identifiants sans nous laisser la possibilité d'en saisir des nouveaux. De même, l'interface ne nous indiquait pas quel était l'ancien compte qui avait été employé.
 
+Nous avons alors tenté de forcer cette manipulation manuellement en passant par le noeud d'API approprié, mais là aussi sans réel succès. En effet, en 3.8, l'API d'enregistrement manuel (`api/v1/cloud.manualRegister`) semblait être non disponible, car l'appel du noeud retournait constamment une 404. En branche 4.8, nous avions toujours des erreurs 405 indiquant une méthode non autorisée. ([src.](https://developer.rocket.chat/reference/api/rest-api/endpoints/core-endpoints/cloud-endpoints/cloud-manual-register))
 
-
-API d'enregistrement manuel (`api/v1/cloud.manualRegister`) semble être non dispo en 3.18.2, car l'appel du noeud retourne une 404. ([src.](https://developer.rocket.chat/reference/api/rest-api/endpoints/core-endpoints/cloud-endpoints/cloud-manual-register))
-
-
-Nouvelle passerelle enregistrée correctment et nouvelles CGU activées, mais dans les logs, on voit que le serveur a été précédemment enregistré sur le site cloud. Il faut retrouver l'accès à ce compte. De même lorsqu'on tente de se déconnecter, et qu'on reclique pour établir une nouvelle collection, Rocket réutilise les anciens identifiants sans nous laisser la possibilité d'en saisir des nouveaux (ou de nous indiquer quel était l'ancien qui a été employé). ([src.](https://docs.rocket.chat/guides/administration/admin-panel/settings/push-notifications-admin-guide))
-
-En cliquant sur le bouton de test pour générer une notification sur les périphériques mobiles, on obtenait un message d'erreur indiquant qu'il n'y avait pas de jeton pour l'utilisateur en cours. Pour pallier ce problème, nous avons juste dû ous déconnecter de l'app mobile et nous reconnecter. Appuyer sur le bouton de test a alors fonctionné avec un toast indiquant que l'action s'était bien passée, mais nous ne recevions quand même pas la notification sur le mobile. 
-
-En regardant dans les logs, on a vu la raison :
-
+En déboguant ce souci, nous nous sommes rendus compte que les logs indiquaient que l'identifiant de notre instance est considéré par Rocket comme ayant déjà bénéficié de la version de test. Notre installation de Rocket.Chat ayant été migrée d'une version plus ancienne, il se peut en effet que la version d'essai ait été préalablement activée.
 ```
 root@lghs-chat-prod:/srv/chat.lghs.be# docker logs -f chatlghsbe-rocketchat-1
 [...]
 Push ➔ info gateway rejected push notification. not retrying. {                                                                                                                             
   statusCode: 422,                                                                                                                                                                          
-  content: '{"code":131,"error":"the amount of push notifications allowed for the workspace was used","requestId":"290ba554-7c27-4286-8559-633b2a29fd90","status":422}',                    
-  headers: {                                                                                                                                                                                
-    'access-control-allow-headers': 'Content-Type, Authorization, Content-Length, X-Requested-With',                                                                                        
-    'access-control-allow-methods': 'GET, PUT, POST, DELETE, OPTIONS',                                                                                                                      
-    'access-control-allow-origin': '*',                                                                                                                                                     
-    'access-control-expose-headers': 'Content-Type, Authorization, Cache-Control, Expires, Pragma, X-powered-by',                                                                           
-    'cache-control': 'private, no-cache, no-store, must-revalidate',                                                                                                                        
-    'content-length': '154',                                                                                                                                                                
-    'content-type': 'application/json; charset=utf-8',                                                                                                                                      
-    date: 'Fri, 23 Dec 2022 05:26:47 GMT',                                                                                                                                                  
-    expires: '-1',                                                                                                                                                                          
-    pragma: 'no-cache',                                                                                                                                                                     
-    vary: 'Accept-Encoding',                                                                                                                                                                
-    'x-powered-by': 'Rocket Fuel and Rocketeers',                                                                                                                                           
-    connection: 'close'                                                                                                                                                                     
-  },                                                                                                                                                                                        
-  data: {                                                                                                                                                                                   
-    code: 131,                                                                                                                                                                              
-    error: 'the amount of push notifications allowed for the workspace was used',                                                                                                           
-    requestId: '290ba554-7c27-4286-8559-633b2a29fd90',                                                                                                                                      
-    status: 422                                                                                                                                                                             
-  }                                                                                                                                                                                         
-}
+  content: '{"code":131,"error":"the amount of push notifications allowed for the workspace was used","requestId":"290ba554-7c27-4286-8559-633b2a29fd90","status":422}',    
+[...]
 ```
 
-Une des solutions serait d'aller supprimer l'enregistrement en base de données selon les collections dont les noms commenceraient par `Cloud_*`. ([src.](https://forums.rocket.chat/t/cloud-registration-token-problem/14995/2))
-
-Cependant, nous n'avons rien trouvé de tel en tentant de les lister.
+Pour outrepasser ce problème, l'idée alors retenue est de réinitialiser les paramètres de connexion aux Connectivity Services de la base de données. La réinitialisation de ces paramètres est souvent mentionnée sur les forums ([src.](https://forums.rocket.chat/t/cloud-registration-token-problem/14995/2)) et consiste à effacer de la base de données les champs des collections dont les noms commencent par `Cloud_*`. La procédure exacte n'est cependant pas détaillée, nous l'avons demandée au support que nous avons contacté par le bais de l'instance communautaire de Rocket.Chat :
 ```
-rs0:PRIMARY> db.getCollectionNames()
-```
-([src.](https://www.mongodb.com/docs/manual/reference/command/listCollections/))
-
-
-Efface les données de configuration de cloud :
-
-```
-db.rocketchat_settings.update({_id:/Cloud_.*/}, {$set:{value:""}},{multi:true})
+root@lghs-chat-prod:/srv/chat.lghs.be# docker exec -it chatlghsbe-mongo-1 /bin/bash
+root@1a94c64af5cc:/# mongo
+[...]
+rs0:PRIMARY> use rocketchat
+switched to db rocketchat
+rs0:PRIMARY> db.rocketchat_settings.update({_id:/Cloud_.*/}, {$set:{value:""}},{multi:true})
 ```
 
-Mais la commande efface de trop, il faut réinitialiser la valeur de l'URL du serveur par défaut :
+Cependant cette commande efface de trop, il faut alors rétablir la valeur de l'URL du serveur des Connectivity Services :
+```
+rs0:PRIMARY> db.rocketchat_settings.update({_id:"Cloud_Url"},{$set: {value: "https://cloud.rocket.chat"}})
+```
 
-```
-db.rocketchat_settings.update({_id:"Cloud_Url"},{$set: {value: "https://cloud.rocket.chat"}})
-```
+Une fois les paramètres réinitialisés, il suffit de suivre la méthode expliquée dans le guide d'administration ([src.](https://docs.rocket.chat/use-rocket.chat/rocket.chat-workspace-administration/connectivity-services)) en prenant soin toutefois de l'adapter comme suit.
+
+1. Connectez-vous sur `https://cloud.rocket.chat` avec le compte créé dont le mot de passe se trouve sur l'instance Vaultwarden interne du Liege Hackerspace (`https://vault.lghs.lan`) (cf. [documentation](https://wiki.liegehacker.space/books/services/page/le-vault)).
+
+   Sélectionner le menu `Workspaces` dans la barre latérale de gauche et cliquez sur le bouton `Register self-managed` en haut à droite.
+
+   ![](img/doc-rocket-chat-reenable-push-notifications-0001.png)
+
+2. Cliquez que le bouton `Copy Token and Continue Online` pour copier le jeton d'enregistrement dans votre presse papier.
+
+   ![](img/doc-rocket-chat-reenable-push-notifications-0002.png)
+
+3. Retournez dans l'instance Rocket.Chat, cliquez sur le menu hamburger et sur le sous-menu `Workspace` :
+
+   ![](img/doc-rocket-chat-reenable-push-notifications-0003.png)
+
+4. Cliquez sur `Services de connectivité` dans la barre latérale de gauche, collez le jeton que vous venez de copier de l'étape précédente et cliquez sur le bouton `Connexion`.
+
+   ![](img/doc-rocket-chat-reenable-push-notifications-0004.png)
+
+5. Vous allez alors obtenir la page suivante :
+
+   ![](img/doc-rocket-chat-reenable-push-notifications-0005.png)
+
+   Si vous tentez de cliquer sur le bouton `Synchroniser` pour forcer une synchronisation entre l'instance de Rocket.Chat et le cloud, cette action mènera à une erreur matérialisée par la stack trace suivante dans les logs :
+   ```
+   {"level":50,"time":"2023-01-25T12:51:49.174Z","pid":9,"hostname":"e0c33ac68892","name":"System","msg":"Failed to sync with Rocket.Chat Cloud","err":{"type":"Error","message":"failed [400]","stack":"Error: failed [400]\n    at makeErrorByStatus (server/lib/http/call.ts:59:9)\n    at server/lib/http/call.ts:168:19\n    at /app/bundle/programs/server/npm/node_modules/meteor/promise/node_modules/meteor-promise/fiber_pool.js:43:40","response":{"statusCode":400,"content":"","headers":{"access-control-allow-headers":"Content-Type, Authorization, Content-Length, Last-Event-ID, X-Requested-With","access-control-allow-methods":"GET, PUT, POST, DELETE, OPTIONS","access-control-allow-origin":"*","access-control-expose-headers":"Content-Type, Authorization, Cache-Control, Expires, Pragma, X-powered-by","cache-control":"private, no-cache, no-store, must-revalidate","connection":"close","content-length":"0","date":"Wed, 25 Jan 2023 12:51:49 GMT","expires":"-1","pragma":"no-cache","vary":"Accept-Encoding","x-fleet-version":"-783de2c","x-powered-by":"Rocket Fuel and Rocketeers"},"ok":false,"data":null}},"msg":"failed [400]"}
+   ```
+
+6. Retournez sur le site du cloud Rocket (`https://cloud.rocket.chat`). VL'instance devrait désormais être visible. Cliquez sur le bouton `Apply Trial` en regard de l'instance dans la liste pour demander une version d'essai :
+
+   ![](img/doc-rocket-chat-reenable-push-notifications-0006.png)
+
+7. Confirmez la demande de version d'essai en cliquant sur le bouton `Apply Trial` de la popup qui vient d'apparaitre :
+
+   ![](img/doc-rocket-chat-reenable-push-notifications-0007.png)
+
+8. Une popup apparait maintenant pour vous indiquer qu'une version d'essai pour la version entreprise a été appliquée avec succès et qu'il est nécessaire de resynchroniser l'instance pour que le changement soit pris en considération. Une resynchronisation s'effectue automatiquement toutes les 12 heures, mais pour éviter d'attendre ce délai, nous allons reforcer une synchronisation.
+
+   ![](img/doc-rocket-chat-reenable-push-notifications-0008.png)
+
+9. Retourner sur la page des services de connectivité sur l'instance et lier vous à votre compte Rocket en cliquant sur le bouton `Connection au cloud Rocket.Chat` :
+
+   ![](img/doc-rocket-chat-reenable-push-notifications-0009.png)
+
+   Note : comme vous le voyez sur la capture il se peut que la version entreprise soit déjà détectée (cf. mention entreprise en haut à gauche), si tel n'était pas le cas, cliquez simplement sur le bouton `Synchroniser`.
+
+10. Vous allez maintenant être redirigé vers votre compte Rocket avec un panneau de demande d'accès OAuth, cliquez sur le bouton `Authorize`.
+
+   ![](img/doc-rocket-chat-reenable-push-notifications-0010.png)
+
+11. Vous allez être redirigé vers la page précédente sur l'instance Rocket.
+
 
 
 ## Upgrade vers 5.0.8
