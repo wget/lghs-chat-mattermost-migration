@@ -1211,7 +1211,7 @@ Lancez la stack MongoDB 4.4.18 :
 root@lghs-chat-test:/srv/chat.lghs.be# docker compose -f docker-compose-prod-5.3.5-mongodb-4.4.18.yml up -d
 ```
 
-Importez le backup de base de données et attendez bien la fin de la recréation dex index :
+Importez le backup de base de données et attendez bien la fin de la recréation des index :
 ```
 root@lghs-chat-test:/srv/chat.lghs.be# docker exec -it chatlghsbe-mongo-1 /bin/bash
 root@d5bdf2fd45ea:/# cd /backups/
@@ -1227,7 +1227,7 @@ ression:primitive.D(nil)}
 
 Une fois importé, laissez tourner quelques minutes le temps que les index se réimportent.
 
-Une fois les ressorces systèmes revenues à un état normal, vérifiez bien que les fonctionnalités de la base de données sont bien définies sur le jeu 4.4 et regardez aussi la sortie de `rs.status()` si vous ne voyez pas des éléments qui seraient étranges :
+Une fois les ressources systèmes revenues à un état normal, vérifiez bien que les fonctionnalités de la base de données sont bien définies sur le jeu 4.4 et regardez aussi la sortie de `rs.status()` si vous ne voyez pas des éléments qui seraient étranges ([src.](https://docs.rocket.chat/resources/getting-support/enterprise-support#mongodb-support)) :
 ```
 root@lghs-chat-prod:/srv/chat.lghs.be# docker exec -it chatlghsbe-mongo-1 /bin/bash
 root@700faf1b06cb:/# mongo
