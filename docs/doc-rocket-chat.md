@@ -955,11 +955,13 @@ Une fois les paramètres réinitialisés, il suffit de suivre la méthode expliq
     root@lghs-chat-prod:/srv/chat.lghs.be# docker compose -f docker-compose-prod-4.8.6.yml up -d
     ```
 
-En cliquant sur le bouton de test pour générer une notification sur les périphériques mobiles, on obtenait un message d'erreur indiquant qu'il n'y avait pas de jeton pour l'utilisateur en cours. Pour pallier ce problème, nous avons juste dû ous déconnecter de l'app mobile et nous reconnecter. Appuyer sur le bouton de test a alors fonctionné avec un toast indiquant que l'action s'était bien passée, mais nous ne recevions quand même pas la notification sur le mobile.
+23. Les notifications push devraient maintenant fonctionner. Pour vous en convraincre, allez dans le panneau d'administration, dans la section `Push`, faites défiler la page jusqu'à voir le bouton `Envoyer une notification push test à mon utilisateur` et cliquez dessus. Un popup en haut à droite devrait alors s'afficher pour signifier le succès de l'opération.
 
+    ![](img/doc-rocket-chat-reenable-push-notifications-0020.png)
 
-https://forums.rocket.chat/t/unable-to-send-push-notifications-there-are-no-tokens-for-this-user/12285
+    Si vous obtenez un message d'erreur indiquant qu'il n'y a pas de jeton pour l'utilisateur en cours, assurez vous d'avoir l'application mobile installée et votre utilisateur connecté(évidemment), ou forcez un rafraichissement d'un canal dans l'application mobile. En effet, lorsque le serveur vient de redémarrer, il se peut que le jeton précédent soit perdu. Rafraichir un canal permet de rafraichir également le jeton. ([src.](https://forums.rocket.chat/t/x/12285/3))
 
+    Si vous appuyez sur le bouton de test et qu'un toast indique que l'action s'est bien passée, mais qu'au contraire, vous ne recevez pas de notification sur mobile, le souci peut venir de l'infra de Rocket.Chat, plus précisément de la connexion entre la passerelle de Rocket avec le serveur push de Google/Apple. Dans pareil cas, recommencer la procédure de cette section en résenregistrant le serveur (soit la préocédure à partir du point 12) nous a permis de résoudre le souci.
 
 ## Upgrade vers 5.0.8
 
