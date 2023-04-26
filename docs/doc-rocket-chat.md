@@ -813,7 +813,6 @@ rs0:PRIMARY> db.migrations.update({"_id": "control"}, {$set:{locked: false}})
 {"line":"120","file":"migrations.js","message":"Migrations: Finished migrating.","time":{"$date":1671721103742},"level":"info"}
 ```
 
-
 ## Réactivation des notifications push
 
 Étant sur une 4.8.6, nous disposons maintenant d'une version suffisamment récente que pour permettre la réactivation des notifications push qui dépendent des Connectiviy Services. Ces derniers nécessitent (à l'heure où ces lignes sont écrites - décembre 2022 -) a minima une branche 4.x de Rocket.Chat pour pouvoir être utilisés. ([src.](https://docs.rocket.chat/rocket.chat-resources/getting-support/enterprise-support#rocket.chat-services))
@@ -962,6 +961,19 @@ Une fois les paramètres réinitialisés, il suffit de suivre la méthode expliq
     Si vous obtenez un message d'erreur indiquant qu'il n'y a pas de jeton pour l'utilisateur en cours, assurez vous d'avoir l'application mobile installée et votre utilisateur connecté(évidemment), ou forcez un rafraichissement d'un canal dans l'application mobile. En effet, lorsque le serveur vient de redémarrer, il se peut que le jeton précédent soit perdu. Rafraichir un canal permet de rafraichir également le jeton. ([src.](https://forums.rocket.chat/t/x/12285/3))
 
     Si vous appuyez sur le bouton de test et qu'un toast indique que l'action s'est bien passée, mais qu'au contraire, vous ne recevez pas de notification sur mobile, le souci peut venir de l'infra de Rocket.Chat, plus précisément de la connexion entre la passerelle de Rocket avec le serveur push de Google/Apple. Dans pareil cas, recommencer la procédure de cette section en résenregistrant le serveur (soit la préocédure à partir du point 12) nous a permis de résoudre le souci.
+
+Note : Si vous devez réactiver les notifications pour une version plus récente de Rocket.Chat, voici la procédure généraliste qu'il faut suivre :
+* Réinitialiser les paramètres de la base de données tel que décrit plus haut dans ce document
+* Relancer la recette Docker Compose
+* Réenregistrer l'instance sur le cloud Rocket.Chat
+* Désactiver les Connectivity Services
+* Les réactiver
+* Forcer un Resync
+* Activer la version entreprise à partir du cloud Rocket.Chat
+* Forcer un Resync
+* Relancer la recette Docker Compose
+* Ouvrir l'app mobile pour forcer le jeton à s'actualiser
+* Faire un test de notification via les paramètres
 
 ## Upgrade vers 5.0.8
 
