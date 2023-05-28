@@ -1356,6 +1356,147 @@ For more information, check the migration guide at https://a.co/7PzMCcy
 (Use `node --trace-warnings ...` to show where the warning was created)
 ```
 
+## Upgrade vers MongoDB 6.0.6
+
+Dumpez la base de données à partir du conteneur :
+
+```
+root@lghs-chat-test:/srv/chat.lghs.be# docker exec -it chatlghsbe-mongo-1 /bin/bash
+root@d5bdf2fd45ea:/# cd /backups/
+root@d5bdf2fd45ea:/backups# mongodump
+[...]
+root@d5bdf2fd45ea:/backups# exit
+```
+
+Stoppez la stack Docker :
+```
+root@lghs-chat-test:/srv/chat.lghs.be# docker compose -f docker-compose-prod-6.2.2-mongodb-5.0.14.yml down
+```
+
+Créez un nouveau fichier de recette Docker Compose :
+```
+root@lghs-chat-test:/srv/chat.lghs.be# cp docker-compose-prod-6.2.2-mongodb-5.0.14.yml docker-compose-prod-6.2.2-mongodb-6.0.6.yml
+```
+
+Supprimez les fichiers de la base de données :
+```
+root@lghs-chat-test:/srv/chat.lghs.be# rm -r data/db
+```
+
+Adapter le fichier de recette Docker Compose comme tel, en laissant bien Rocket.Chat commenté et en supprimant la partie réservée au conteneur en charge du réplicat :
+```
+docker-compose-prod-6.2.2-mongodb-6.0.6.yml
+```
+```
+version: "3.9"
+
+services:
+  #  rocketchat:
+  #    image: rocketchat/rocket.chat:6.2.2
+  #    command: >
+  #      bash -c
+  #        "for i in `seq 1 30`; do
+  #          node main.js &&
+  #          s=$$? && break || s=$$?;
+  #          echo \"Tried $$i times. Waiting 5 secs...\";
+  #          sleep 5;
+  #        done; (exit $$s)"
+  #    restart: unless-stopped
+  #    volumes:
+  #      - "/srv/chat.lghs.be/data/www:/app/uploads/"
+  #    environment:
+  #      - PORT=3000
+  #      - ROOT_URL=https://chat.lghs.be
+  #      - MONGO_URL=mongodb://mongo:27017/rocketchat
+  #      - MONGO_OPLOG_URL=mongodb://mongo:27017/local
+  #    depends_on:
+  #      - mongo
+  #    ports:
+  #      - 3000:3000
+
+  mongo:
+    image: mongo:6.0.6
+    restart: unless-stopped
+    volumes:
+     - "/srv/chat.lghs.be/data/db:/data/db/"
+     - "/srv/chat.lghs.be/backups:/backups/"
+    command: mongod --oplogSize 128 --replSet rs0
+```
+
+Lancez la stack MongoDB 6.0.6 :
+```
+root@lghs-chat-test:/srv/chat.lghs.be# docker compose -f docker-compose-prod-6.2.2-mongodb-6.0.6.yml up -d
+```
+
+Importez le backup de base de données et attendez bien la fin de la recréation des index :
+```
+root@lghs-chat-test:/srv/chat.lghs.be# docker exec -it chatlghsbe-mongo-1 /bin/bash
+root@d5bdf2fd45ea:/# cd /backups/
+root@d5bdf2fd45ea:/backups# mongorestore --drop  dump/
+[...]
+2023-05-28T12:49:23.108+0000    restoring indexes for collection config.tenantMigrationDonors from metadata
+2023-05-28T12:49:23.108+0000    index: &idx.IndexDocument{Options:primitive.M{"expireAfterSeconds":0, "name":"TenantMigrationDonorTTLIndex", "v":2}, Key:primitive.D{primitive.E{Key:"expireAt", Value:1}}, PartialFilterExpression:primitive.D(nil)}
+2023-05-28T12:49:23.191+0000    restoring indexes for collection config.external_validation_keys from metadata
+2023-05-28T12:49:23.192+0000    index: &idx.IndexDocument{Options:primitive.M{"expireAfterSeconds":0, "name":"ExternalKeysTTLIndex", "v":2}, Key:primitive.D{primitive.E{Key:"ttlExpiresAt", Value:1}}, PartialFilterExpression:primitive.D(nil)}
+2023-05-28T12:49:23.192+0000    restoring indexes for collection config.tenantMigrationRecipients from metadata
+2023-05-28T12:49:23.193+0000    index: &idx.IndexDocument{Options:primitive.M{"expireAfterSeconds":0, "name":"TenantMigrationRecipientTTLIndex", "v":2}, Key:primitive.D{primitive.E{Key:"expireAt", Value:1}}, PartialFilterExpression:primitive.D(nil)}
+2023-05-28T12:49:30.911+0000    829948 document(s) restored successfully. 0 document(s) failed to restore.
+```
+
+Une fois importé, laissez tourner quelques minutes le temps que les index se réimportent.
+
+Une fois les ressources systèmes revenues à un état normal, vérifiez bien que les fonctionnalités de la base de données sont bien définies sur le jeu 6.0 et regardez aussi la sortie de `rs.status()` si vous ne voyez pas des éléments qui seraient étranges ([src.](https://docs.rocket.chat/resources/getting-support/enterprise-support#mongodb-support)) :
+```
+root@lghs-chat-prod:/srv/chat.lghs.be# docker exec -it chatlghsbe-mongo-1 /bin/bash
+root@700faf1b06cb:/# mongosh
+rs0 [direct: primary] test> db.adminCommand( { getParameter: 1, featureCompatibilityVersion: 1 } )
+{
+  featureCompatibilityVersion: { version: '6.0' },
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1685278206, i: 1 }),
+    signature: {
+      hash: Binary(Buffer.from("0000000000000000000000000000000000000000", "hex"), 0),
+      keyId: Long("0")
+    }
+  },
+  operationTime: Timestamp({ t: 1685278206, i: 1 })
+}
+
+rs0 [direct: primary] test> rs.status()
+```
+
+Si tout est bon, stoppez la stack :
+```
+root@lghs-chat-test:/srv/chat.lghs.be# docker compose -f docker-compose-prod-6.2.2-mongodb-6.0.6.yml down
+```
+
+**Décommentez** le service relatif Rocket.Chat de la recette Docker Compose et relancez la stack :
+```
+root@lghs-chat-test:/srv/chat.lghs.be# docker compose -f docker-compose-prod-6.2.2-mongodb-6.0.6.yml up -d
+```
+
+Assurez-vous que Rocket.Chat fonctionne bien et qu'il détecte bien le nouveau moteur MongoDB.
+
+Enfin, supprimez l'export des données :
+```
+root@lghs-chat-test:/srv/chat.lghs.be# rm -r backups/dump*
+```
+
+Supprimez enfin les anciens images de conteneur de façon à libérer de la place :
+```
+root@lghs-chat-prod:/srv/chat.lghs.be# docker image prune -a
+WARNING! This will remove all images without at least one container associated to them.
+Are you sure you want to continue? [y/N] y
+Deleted Images:
+untagged: mongo:5.0.14
+untagged: mongo@sha256:858e0b569e47dcf9fa654995e20c1a79d171016e7d0a222496b183e4a0914135
+deleted: sha256:4318aabd7fa84a82c7a453ef74ff66f10bd5dd22ba4be77488f7824e98821cac
+[...]
+Total reclaimed space: 1.933GB
+```
+
+
 ## Versions prises en charge
 
 https://docs.rocket.chat/getting-support/enterprise-support
