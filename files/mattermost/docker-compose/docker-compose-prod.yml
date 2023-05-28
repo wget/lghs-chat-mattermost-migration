@@ -1,0 +1,115 @@
+# Syntax reference: https://docs.docker.com/compose/compose-file/compose-file-v3/
+version: "3.9"
+
+services:
+  mattermost-prod-web:
+    image: mattermost/mattermost-team-edition:latest
+    container_name: mattermost-prod-web
+    labels:
+      - "com.centurylinklabs.watchtower.scope=mattermost-prod"
+    environment:
+      # 'environment' can use either an array or a map. Any boolean values;
+      # true, false, yes, no, SHOULD be enclosed in quotes to ensure they are
+      # not converted to True or False by the YAML parser.
+      # src.: https://docs.docker.com/compose/compose-file/#environment
+      - TZ=CET
+      # General config
+      - MM_SQLSETTINGS_DRIVERNAME=postgres
+      - MM_SQLSETTINGS_DATASOURCE=postgres://mattermost:<cf. password manager>@mattermost-prod-db:5432/mattermostdb?sslmode=disable&connect_timeout=10
+      - MM_SERVICESETTINGS_SITEURL=https://mm.lghs.be
+      # Emailing config
+      - MM_EMAILSETTINGS_SMTPSERVER=mail.lghs.space
+      - MM_EMAILSETTINGS_SMTPPORT=465
+      - MM_EMAILSETTINGS_ENABLESMTPAUTH=true
+      - MM_EMAILSETTINGS_SMTPUSERNAME=ne-pas-repondre@lghs.space
+      - MM_EMAILSETTINGS_SMTPPASSWORD=<cf. password manager>
+      - MM_EMAILSETTINGS_CONNECTIONSECURITY=TLS
+      - MM_EMAILSETTINGS_FEEDBACKEMAIL=ne-pas-repondre@lghs.space
+      - MM_EMAILSETTINGS_REPLYTOADDRESS=ne-pas-repondre@lghs.space
+      # Search and speed config
+      - MM_BLEVESETTINGS_INDEXDIR=/mattermost/bleve-indexes
+      - MM_BLEVESETTINGS_ENABLEINDEXING=true
+      - MM_BLEVESETTINGS_ENABLESEARCHING=true
+      # Disable telemetry
+      # src.: https://docs.mattermost.com/manage/telemetry.html
+      - MM_EMAILSETTINGS_ENABLESECURITYFIXALERT=false
+      # Plugins
+      - MM_PLUGINSETTINGS_ENABLEUPLOADS=true
+    volumes:
+      # Store the server data content (assets, images, plugins, etc.) to the
+      # physical host
+      # MATTERMOST_CONFIG_PATH
+      - /srv/mm.lghs.be/data/www/config:/mattermost/config:rw
+      # MATTERMOST_DATA_PATH
+      - /srv/mm.lghs.be/data/www/data:/mattermost/data:rw
+      # MATTERMOST_LOGS_PATH
+      - /srv/mm.lghs.be/data/www/logs:/mattermost/logs:rw
+      # MATTERMOST_PLUGINS_PATH
+      - /srv/mm.lghs.be/data/www/plugins:/mattermost/plugins:rw
+      # MATTERMOST_CLIENT_PLUGINS_PATH
+      - /srv/mm.lghs.be/data/www/client/plugins:/mattermost/client/plugins:rw
+      # MATTERMOST_BLEVE_INDEXES_PATH
+      - /srv/mm.lghs.be/data/www/bleve-indexes:/mattermost/bleve-indexes:rw
+    networks:
+      # In this YAML grammar, 'networks' is a list
+      - mattermost-prod-network
+    ports:
+      # In this YAML grammar, 'ports' is a list that must be a string (hence
+      # quotes) as numbers in YAML is parsing numbers as a base-60 values.
+      - "8065:8065"
+    depends_on:
+      - mattermost-prod-db
+    # We should always have a restart policy as this is good practise.
+    restart: always
+
+  mattermost-prod-db:
+    image: postgres:13-alpine
+    container_name: mattermost-prod-db
+    environment:
+      - TZ=CET
+      - POSTGRES_DB=mattermostdb
+      - POSTGRES_USER=mattermost
+      - POSTGRES_PASSWORD=<cf. password manager>
+    volumes:
+      - "/srv/mm.lghs.be/data/db:/var/lib/postgresql/data"
+    networks:
+      - mattermost-prod-network
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 100
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
+    restart: always
+
+  mattermost-prod-updater:
+    image: containrrr/watchtower
+    container_name: mattermost-prod-updater
+    labels:
+      - "com.centurylinklabs.watchtower.scope=mattermost-prod"
+    environment:
+      - WATCHTOWER_POLL_INTERVAL=60
+      # Ask watchtower to only monitor containers in this scope
+      - WATCHTOWER_SCOPE=mattermost-prod
+      # Needed if we deployed a crashing container and the latter keeps
+      # restarting.
+      - WATCHTOWER_INCLUDE_RESTARTING=true
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_DEBUG=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - mattermost-prod-network
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 200
+    restart: always
+
+networks:
+  # Needed to avoid a default network to be created
+  # "parent-folder-name_default".
+  # As the difference of Docker, Docker-Compose is always creating a dedicated
+  # bridge network whose name is based on the project (current name folder)
+  mattermost-prod-network:
+    name: mattermost-prod-network
