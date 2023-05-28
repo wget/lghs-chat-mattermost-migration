@@ -1327,6 +1327,35 @@ Le site charge dans le vide sans raison.
 
 Il existe également un problème rapporté dans l'app mobile avec les serveurs 5.4.0 et 5.4.1 : les utilisateurs utilisant un SSO (notre cas) ne savent plus se connecter une fois leur jeton d'accès expiré. Un correctif est en cours de publication. ([src.](https://github.com/RocketChat/Rocket.Chat.ReactNative/pull/4783))
 
+Update 2023-05-28 : Nous avons attendu une mise à jour de la branche 5.4 qui corrigeait le souci d'authentification. Malgré le correctif, le frontend web n'arrêtait pas de crasher à cause d'exceptions de ce type :
+```
+Exception while invoking method autoTranslate.getSupportedLanguages
+```
+ou
+```
+LivechatRoomsRaw.unsetAllPredictedVisitorAbandonment
+```
+Le JSON reçu du serveur était également malformé menant à un crash du frontend.
+
+## Upgrade vers 6.2.2
+
+Nous avons dû attendre cette version en version 6.x, c'était la seule qui a permis un passage direct de 5.3 à 6.2.
+
+Le frontend ne crashe plus et l'OAuth fonctionne également.
+
+Les migrations de schéma DB ont également réussi.
+
+Il subsiste toutefois une erreur mineure d'index dans les logs :
+```
+Some indexes for collection 'rocketchat_uploads' could not be created:
+An existing index has the same name as the requested index. When index names are not specified, they are auto generated and can cause conflicts. Please refer to our documentation. Requested index: { v: 2, key: { rid: 1 }, name: "rid_1", sparse: true }, existing index: { v: 2, key: { rid: 1 }, name: "rid_1" 
+}
+(node:8) NOTE: We are formalizing our plans to enter AWS SDK for JavaScript (v2) into maintenance mode in 2023.
+Please migrate your code to use AWS SDK for JavaScript (v3).
+For more information, check the migration guide at https://a.co/7PzMCcy
+(Use `node --trace-warnings ...` to show where the warning was created)
+```
+
 ## Versions prises en charge
 
 https://docs.rocket.chat/getting-support/enterprise-support
