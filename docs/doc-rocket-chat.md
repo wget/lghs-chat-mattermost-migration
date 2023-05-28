@@ -95,6 +95,9 @@ Pour que les autres membres du LgHS puissent y accéder, voici les étapes de cr
    ![](img/doc-rocket-chat-scaleway-machine-creation-0017.png)
 22. Vous allez tomber sur cet écran avec un résumé de la configuration de la machine. Ce qui nous intéresse ici, ce sont les adresses IPv4 et IPv6. Cliquez sur les boutons ad-hoc pour les copier dans votre presse papier.
    ![](img/doc-rocket-chat-scaleway-machine-creation-0018.png)
+
+    Note : Scaleway recommande d'utiliser le nom de domaine de la machine et de l'utiliser comme cible d'un CNAME, ceci de façon à s'assurer que l'IPv6 reste stable après que la machine ait redémarré après une maintenance par exemple. Cependant, utiliser le CNAME fourni par Scaleway implique de casser DNSSEC. C'est la raison pour laquelle nous utilisons les adresses IPv4 et IPv directemement respectivement comme cible A/AAAA. L'inconvénient est qu'il faut alors chaque fois modifier le champ IPv6 manuellement en cas de redémarrage de la machine.
+
 23. Assurez-vous d'avoir vos identifiants à portée de main ou d'avoir une délégation d'accès sur le compte Cloudflare du Liege Hackerspace. Connectez-vous à l'interface de Cloudflare via `https://dash.cloudflare.com` afin de configurer les entrées DNS relatives à cette nouvelle instance.
    ![](img/doc-rocket-chat-scaleway-machine-creation-0019.png)
 24. Tapez votre code d'identification multifacteur (cette option devrait être activée pour votre compte; dans le cas contraire, ça représenterait un risque de sécurité qu'il serait nécessaire de corriger).
