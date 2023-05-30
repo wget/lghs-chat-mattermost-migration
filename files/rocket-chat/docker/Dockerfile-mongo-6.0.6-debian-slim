@@ -1,5 +1,5 @@
-FROM debian:stable-slim
-CMD /bin/bash
+FROM debian:stable-slim as builder
+COPY --chmod=0755 ldd-copy-dependencies.sh /home/ldd-copy-dependencies.sh
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install gnupg curl -y && \
@@ -8,12 +8,40 @@ RUN apt-get update && \
         --dearmor && \
     echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-6.0.gpg] http://repo.mongodb.org/apt/debian bullseye/mongodb-org/6.0 main" | tee /etc/apt/sources.list.d/mongodb-org-6.0.list && \
     apt-get update && \
-    apt-get install mongodb-org -y
+    apt-get install mongodb-org -y && \
+    mkdir -p /home/deps/ && \
+    /home/ldd-copy-dependencies.sh -b /usr/bin/mongod -t /home/deps/ && \
+    /home/ldd-copy-dependencies.sh -b /usr/bin/mongodump -t /home/deps/ && \
+    /home/ldd-copy-dependencies.sh -b /usr/bin/mongoexport -t /home/deps/ && \
+    /home/ldd-copy-dependencies.sh -b /usr/bin/mongofiles -t /home/deps/ && \
+    /home/ldd-copy-dependencies.sh -b /usr/bin/mongoimport -t /home/deps/ && \
+    /home/ldd-copy-dependencies.sh -b /usr/bin/mongorestore -t /home/deps/ && \
+    /home/ldd-copy-dependencies.sh -b /usr/bin/mongos -t /home/deps/ && \
+    /home/ldd-copy-dependencies.sh -b /usr/bin/mongosh -t /home/deps/ && \
+    /home/ldd-copy-dependencies.sh -b /usr/bin/mongostat -t /home/deps/ && \
+    /home/ldd-copy-dependencies.sh -b /usr/bin/mongotop -t /home/deps/ && \
+    # Wolpi base has /lib64 symlinked to /lib
+    # we need to avoid to copy to /lib64 as the file will already exist as a
+    # symlink, the COPY command will fail with an error such as:
+    # Error: cannot copy to non-directory with buildx only
+    # src.: https://github.com/docker/buildx/issues/150
+    mv -v /home/deps/lib64/* /home/deps/lib/ && \
+    rm -rv /home/deps/lib64
 
-
-#FROM debian:stable-slim
 FROM cgr.dev/chainguard/wolfi-base
-VOLUME [/data/db /data/configdb]
-ENTRYPOINT ["docker-entrypoint.sh"]
+COPY --from=builder /home/deps/ /
+COPY --from=builder /etc/mongod.conf /etc/
+COPY --from=builder /usr/bin/mongod /usr/bin/
+COPY --from=builder /usr/bin/mongodump /usr/bin/
+COPY --from=builder /usr/bin/mongoexport /usr/bin/
+COPY --from=builder /usr/bin/mongofiles /usr/bin/
+COPY --from=builder /usr/bin/mongoimport /usr/bin/
+COPY --from=builder /usr/bin/mongorestore /usr/bin/
+COPY --from=builder /usr/bin/mongos /usr/bin/
+COPY --from=builder /usr/bin/mongosh /usr/bin/
+COPY --from=builder /usr/bin/mongostat /usr/bin/
+COPY --from=builder /usr/bin/mongotop /usr/bin/
+COPY entrypoint.sh script.js /
+#VOLUME [/data/db /data/configdb]
+#ENTRYPOINT ["docker-entrypoint.sh"]
 EXPOSE 27017
-CMD ["mongod"]

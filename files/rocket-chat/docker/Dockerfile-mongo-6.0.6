@@ -1,2 +1,41 @@
-FROM mongo:6.0.6
-RUN apt-get update && apt-get upgrade -y
+# gosu seems to be not vulnerable to the followin golang sys/unix reported by
+# snyk:
+# src.: https://security.snyk.io/vuln/SNYK-GOLANG-GOLANGORGXSYSUNIX-3310442
+#
+# A check using govulncheck on the binary and on the sources doesn't return
+# anything at all, which means snyk could be at fault here like mentioned in
+# the security section "If you have a tool which is reporting that gosu is
+# vulnerable to a particular CVE but govulncheck does not agree"
+# src.: https://github.com/tianon/gosu/blob/master/SECURITY.md
+# However, for learning purpose we are rebuilding it
+FROM debian:bullseye-slim as builder-gosu
+RUN echo "deb http://deb.debian.org/debian bullseye-backports main contrib non-free" >> /etc/apt/sources.list && \
+    apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install golang -t bullseye-backports -y && \
+    apt-get install git -y && \
+    apt-get install curl -y && \
+    cd /root; curl -LOC - https://github.com/tianon/gosu/archive/refs/tags/1.16.tar.gz; tar -xvf 1.16.tar.gz; cd gosu-1.16/ && \
+    go get github.com/opencontainers/runc@v1.1 && \
+    go build -v -ldflags '-d -w' -o gosu
+
+FROM mongo:6.0.6 as builder
+COPY --from=builder-gosu /root/gosu-1.16/gosu /usr/local/bin/gosu
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get remove --purge gnupg -y && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -fr /var/log/* && \
+    rm -fr /tmp/* && \
+    # Using find with -delete is needed because rm is returning a non 0 return
+    # value making the Docker build process fail.
+    # rm: refusing to remove '.' or '..' directory: skipping '/root/.'
+    # rm: refusing to remove '.' or '..' directory: skipping '/root/..'
+    find /root/ -delete
+
+# Let's build from scratch, actually an explicit image
+# src.: https://hub.docker.com/_/scratch
+# layer squashing is still experimental
+# src.: https://docs.docker.com/engine/reference/commandline/build/#squash
+FROM scratch
+COPY --from=builder / /
