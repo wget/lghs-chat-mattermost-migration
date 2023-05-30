@@ -1496,6 +1496,240 @@ deleted: sha256:4318aabd7fa84a82c7a453ef74ff66f10bd5dd22ba4be77488f7824e98821cac
 Total reclaimed space: 1.933GB
 ```
 
+## Patching du conteneur Docker de MongoDB
+
+Comme Mongo est considéré comme un "Verified Publisher" sur Docker Hub, ils disposent d'un abonnement Docker permettant d'utiliser les fonctionnalités de Docker Scan (et Scout en accès anticipé).
+
+![](img/doc-rocket-chat-docker-mongodb-0001.png)
+
+Ces outils ont révélé des failles de sécurité :
+* une dépendance de Mongo utilisant `gosu` permettant de changer l'utilisateur intérieur du conteneur Docker
+* des dépendances (surtout `perl` et GNUPG )internes à Ubuntu, l'OS sur lequel l'image Mongo est basé
+
+Nous avons utilisé l'outil `Snyk` permettant dans sa version gratuite d'offrir des fonctionnalités similaires à Docker Scan, mais en local, sans avoir besoin d'envoyer son image sur le Docker Hub et/ou ni d'avoir besoin d'avoir un abonnement Docker. Snyk dispose en effet de 100 scans gratuits par mois dans sa version gratuite.
+
+La connexion initiale avec Snyk est aisée. Il suffit de taper `snyk auth`, de coller le lien web qui a été généré, de se connecter via se lien et le client continue son authentification de façon automatique. ([src.](https://docs.snyk.io/snyk-cli/getting-started-with-the-cli))
+
+Pour scanner l'image originale :
+```
+$ snyk container test mongo:6.0.6
+/ Analysing container dependencies for mongo:6.0.6
+```
+
+Ce processus prend un peu de temps. L'indication d'activité se manifeste par la barre "/" qui tourne. Une fois attendu, voici le résultat obtenu :
+```
+snyk container test mongo:6.0.6                                                                                                                                                                     INT ✘ 
+
+Testing mongo:6.0.6...
+
+✗ Low severity vulnerability found in sqlite3/libsqlite3-0
+  Description: CVE-2022-46908
+  Info: https://security.snyk.io/vuln/SNYK-UBUNTU2204-SQLITE3-3167716
+  Introduced through: gnupg2/gnupg@2.2.27-3ubuntu2.1
+  From: gnupg2/gnupg@2.2.27-3ubuntu2.1 > gnupg2/gpg@2.2.27-3ubuntu2.1 > sqlite3/libsqlite3-0@3.37.2-2ubuntu0.1
+  Image layer: Introduced by your base image (mongo:6.0.6-jammy)
+
+✗ Low severity vulnerability found in shadow/passwd
+  Description: Arbitrary Code Injection
+  Info: https://security.snyk.io/vuln/SNYK-UBUNTU2204-SHADOW-5425688
+  Introduced through: shadow/passwd@1:4.8.1-2ubuntu2.1, adduser@3.118ubuntu5, shadow/login@1:4.8.1-2ubuntu2.1
+  From: shadow/passwd@1:4.8.1-2ubuntu2.1
+  From: adduser@3.118ubuntu5 > shadow/passwd@1:4.8.1-2ubuntu2.1
+  From: shadow/login@1:4.8.1-2ubuntu2.1
+  Image layer: Introduced by your base image (mongo:6.0.6-jammy)
+
+✗ Low severity vulnerability found in pcre3/libpcre3
+  Description: Uncontrolled Recursion
+  Info: https://security.snyk.io/vuln/SNYK-UBUNTU2204-PCRE3-2799820
+  Introduced through: pcre3/libpcre3@2:8.39-13ubuntu0.22.04.1, grep@3.7-1build1
+  From: pcre3/libpcre3@2:8.39-13ubuntu0.22.04.1
+  From: grep@3.7-1build1 > pcre3/libpcre3@2:8.39-13ubuntu0.22.04.1
+  Image layer: Introduced by your base image (mongo:6.0.6-jammy)
+
+✗ Low severity vulnerability found in openssl/libssl3
+  Description: Out-of-bounds Read
+  Info: https://security.snyk.io/vuln/SNYK-UBUNTU2204-OPENSSL-5438818
+  Introduced through: openssl/libssl3@3.0.2-0ubuntu1.9, ca-certificates@20211016ubuntu0.22.04.1, mongodb-org@6.0.6, adduser@3.118ubuntu5
+  From: openssl/libssl3@3.0.2-0ubuntu1.9
+  From: ca-certificates@20211016ubuntu0.22.04.1 > openssl@3.0.2-0ubuntu1.9 > openssl/libssl3@3.0.2-0ubuntu1.9
+  From: mongodb-org@6.0.6 > mongodb-org/mongodb-org-database@6.0.6 > mongodb-org/mongodb-org-mongos@6.0.6 > openssl/libssl3@3.0.2-0ubuntu1.9
+  and 5 more...
+  Image layer: Introduced by your base image (mongo:6.0.6-jammy)
+
+✗ Low severity vulnerability found in ncurses/libtinfo6
+  Description: Out-of-bounds Read
+  Info: https://security.snyk.io/vuln/SNYK-UBUNTU2204-NCURSES-2801048
+  Introduced through: ncurses/libtinfo6@6.3-2, bash@5.1-6ubuntu1, ncurses/libncurses6@6.3-2, ncurses/ncurses-bin@6.3-2, procps@2:3.3.17-6ubuntu2, util-linux@2.37.2-4ubuntu3, gnupg2/gnupg@2.2.27-3ubuntu2.1, ncurses/libncursesw6@6.3-2, ncurses/ncurses-base@6.3-2
+  From: ncurses/libtinfo6@6.3-2
+  From: bash@5.1-6ubuntu1 > ncurses/libtinfo6@6.3-2
+  From: ncurses/libncurses6@6.3-2 > ncurses/libtinfo6@6.3-2
+  and 13 more...
+  Image layer: Introduced by your base image (mongo:6.0.6-jammy)
+  Fixed in: 6.3-2ubuntu0.1
+
+✗ Low severity vulnerability found in libzstd/libzstd1
+  Description: Resource Exhaustion
+  Info: https://security.snyk.io/vuln/SNYK-UBUNTU2204-LIBZSTD-3368800
+  Introduced through: meta-common-packages@meta
+  From: meta-common-packages@meta > libzstd/libzstd1@1.4.8+dfsg-3build1
+  Image layer: Introduced by your base image (mongo:6.0.6-jammy)
+
+✗ Low severity vulnerability found in krb5/libkrb5-3
+  Description: Integer Overflow or Wraparound
+  Info: https://security.snyk.io/vuln/SNYK-UBUNTU2204-KRB5-2797765
+  Introduced through: krb5/libkrb5-3@1.19.2-2ubuntu0.1, mongodb-org@6.0.6, adduser@3.118ubuntu5, krb5/libgssapi-krb5-2@1.19.2-2ubuntu0.1, meta-common-packages@meta
+  From: krb5/libkrb5-3@1.19.2-2ubuntu0.1
+  From: mongodb-org@6.0.6 > mongodb-org/mongodb-org-tools@6.0.6 > mongodb-database-tools@100.7.0 > krb5/libkrb5-3@1.19.2-2ubuntu0.1
+  From: adduser@3.118ubuntu5 > shadow/passwd@1:4.8.1-2ubuntu2.1 > pam/libpam-modules@1.4.0-11ubuntu2.3 > libnsl/libnsl2@1.3.0-2build2 > libtirpc/libtirpc3@1.3.2-2ubuntu0.1 > krb5/libgssapi-krb5-2@1.19.2-2ubuntu0.1 > krb5/libkrb5-3@1.19.2-2ubuntu0.1
+  and 8 more...
+  Image layer: Introduced by your base image (mongo:6.0.6-jammy)
+
+✗ Low severity vulnerability found in gnupg2/gpgv
+  Description: Out-of-bounds Write
+  Info: https://security.snyk.io/vuln/SNYK-UBUNTU2204-GNUPG2-3035409
+  Introduced through: gnupg2/gpgv@2.2.27-3ubuntu2.1, apt@2.4.9, gnupg2/gnupg@2.2.27-3ubuntu2.1
+  From: gnupg2/gpgv@2.2.27-3ubuntu2.1
+  From: apt@2.4.9 > gnupg2/gpgv@2.2.27-3ubuntu2.1
+  From: gnupg2/gnupg@2.2.27-3ubuntu2.1 > gnupg2/gpgv@2.2.27-3ubuntu2.1
+  and 18 more...
+  Image layer: Introduced by your base image (mongo:6.0.6-jammy)
+
+✗ Low severity vulnerability found in glibc/libc-bin
+  Description: Allocation of Resources Without Limits or Throttling
+  Info: https://security.snyk.io/vuln/SNYK-UBUNTU2204-GLIBC-2801292
+  Introduced through: glibc/libc-bin@2.35-0ubuntu3.1, meta-common-packages@meta
+  From: glibc/libc-bin@2.35-0ubuntu3.1
+  From: meta-common-packages@meta > glibc/libc6@2.35-0ubuntu3.1
+  Image layer: Introduced by your base image (mongo:6.0.6-jammy)
+
+✗ Low severity vulnerability found in curl/libcurl4
+  Description: CVE-2023-28322
+  Info: https://security.snyk.io/vuln/SNYK-UBUNTU2204-CURL-5561923
+  Introduced through: mongodb-org@6.0.6
+  From: mongodb-org@6.0.6 > mongodb-org/mongodb-org-database@6.0.6 > mongodb-org/mongodb-org-mongos@6.0.6 > curl/libcurl4@7.81.0-1ubuntu1.10
+  From: mongodb-org@6.0.6 > mongodb-org/mongodb-org-database@6.0.6 > mongodb-org/mongodb-org-server@6.0.6 > curl/libcurl4@7.81.0-1ubuntu1.10
+  Image layer: Introduced by your base image (mongo:6.0.6-jammy)
+
+✗ Low severity vulnerability found in curl/libcurl4
+  Description: CVE-2023-28321
+  Info: https://security.snyk.io/vuln/SNYK-UBUNTU2204-CURL-5561951
+  Introduced through: mongodb-org@6.0.6
+  From: mongodb-org@6.0.6 > mongodb-org/mongodb-org-database@6.0.6 > mongodb-org/mongodb-org-mongos@6.0.6 > curl/libcurl4@7.81.0-1ubuntu1.10
+  From: mongodb-org@6.0.6 > mongodb-org/mongodb-org-database@6.0.6 > mongodb-org/mongodb-org-server@6.0.6 > curl/libcurl4@7.81.0-1ubuntu1.10
+  Image layer: Introduced by your base image (mongo:6.0.6-jammy)
+
+✗ Low severity vulnerability found in coreutils
+  Description: Improper Input Validation
+  Info: https://security.snyk.io/vuln/SNYK-UBUNTU2204-COREUTILS-2801226
+  Introduced through: coreutils@8.32-4.1ubuntu1
+  From: coreutils@8.32-4.1ubuntu1
+  Image layer: Introduced by your base image (mongo:6.0.6-jammy)
+
+✗ Low severity vulnerability found in bash
+  Description: Out-of-bounds Write
+  Info: https://security.snyk.io/vuln/SNYK-UBUNTU2204-BASH-3098342
+  Introduced through: bash@5.1-6ubuntu1
+  From: bash@5.1-6ubuntu1
+  Image layer: Introduced by your base image (mongo:6.0.6-jammy)
+
+✗ Medium severity vulnerability found in perl/perl-base
+  Description: Improper Certificate Validation
+  Info: https://security.snyk.io/vuln/SNYK-UBUNTU2204-PERL-5499877
+  Introduced through: meta-common-packages@meta
+  From: meta-common-packages@meta > perl/perl-base@5.34.0-3ubuntu1.1
+  Image layer: Introduced by your base image (mongo:6.0.6-jammy)
+
+✗ Medium severity vulnerability found in ncurses/libtinfo6
+  Description: Out-of-bounds Write
+  Info: https://security.snyk.io/vuln/SNYK-UBUNTU2204-NCURSES-5423142
+  Introduced through: ncurses/libtinfo6@6.3-2, bash@5.1-6ubuntu1, ncurses/libncurses6@6.3-2, ncurses/ncurses-bin@6.3-2, procps@2:3.3.17-6ubuntu2, util-linux@2.37.2-4ubuntu3, gnupg2/gnupg@2.2.27-3ubuntu2.1, ncurses/libncursesw6@6.3-2, ncurses/ncurses-base@6.3-2
+  From: ncurses/libtinfo6@6.3-2
+  From: bash@5.1-6ubuntu1 > ncurses/libtinfo6@6.3-2
+  From: ncurses/libncurses6@6.3-2 > ncurses/libtinfo6@6.3-2
+  and 13 more...
+  Image layer: Introduced by your base image (mongo:6.0.6-jammy)
+  Fixed in: 6.3-2ubuntu0.1
+
+
+
+Organization:      wget
+Package manager:   deb
+Project name:      docker-image|mongo
+Docker image:      mongo:6.0.6
+Platform:          linux/amd64
+Base image:        mongo:6.0.6-jammy
+Licenses:          enabled
+
+Tested 146 dependencies for known issues, found 15 issues.
+
+According to our scan, you are currently using the most secure version of the selected base image
+
+Learn more: https://docs.snyk.io/products/snyk-container/getting-around-the-snyk-container-ui/base-image-detection
+
+-------------------------------------------------------
+
+Testing mongo:6.0.6...
+
+✗ Medium severity vulnerability found in golang.org/x/sys/unix
+  Description: Incorrect Privilege Assignment
+  Info: https://security.snyk.io/vuln/SNYK-GOLANG-GOLANGORGXSYSUNIX-3310442
+  Introduced through: golang.org/x/sys/unix@v0.0.0-20220907062415-87db552b00fd
+  From: golang.org/x/sys/unix@v0.0.0-20220907062415-87db552b00fd
+  Fixed in: 0.1.0
+
+
+
+Organization:      wget
+Package manager:   gomodules
+Target file:       /usr/local/bin/gosu
+Project name:      github.com/tianon/gosu
+Docker image:      mongo:6.0.6
+Licenses:          enabled
+
+Tested 3 dependencies for known issues, found 1 issue.
+
+Snyk wasn’t able to auto detect the base image, use `--file` option to get base image remediation advice.
+Example: $ snyk container test mongo:6.0.6 --file=path/to/Dockerfile
+
+Snyk found some vulnerabilities in your image applications (Snyk searches for these vulnerabilities by default). See https://snyk.co/app-vulns for more information.
+
+To remove these messages in the future, please run `snyk config set disableSuggestions=true`
+
+
+Tested 2 projects, 2 contained vulnerable paths.
+
+```
+
+Pour construire notre image patchée :
+```
+$ cd files/rocket-chat/docker/
+$ docker buildx build -t mongo:6.0-patched -f Dockerfile-mongo-6.0-patched .
+```
+Note : Si l'image a déjà été créée, il est possible d'utiliser l'argument `--no-cache` pour la reconstruire depuis le début.
+```
+$ cd files/rocket-chat/docker/
+$ docker buildx build --no-cache -t mongo:6.0-patched -f Dockerfile-mongo-6.0-patched .
+```
+
+Pour scanner notre image patchée :
+```
+$ cd files/rocket-chat/docker/
+$ snyk container test mongo:6.0-patched --file=./Dockerfile-mongo-6.0-patched
+```
+
+La sortie de cette commande est animée et doit donner un affichage comme tel :
+![](img/doc-rocket-chat-docker-mongodb-0002.png)
+
+Comme vous pouvez le voir sur la sortie, notre nouveau conteneur ne dispose plus de niveaux intermédiaires (layers). Vous pouvez vous en convaincre à l'aide de l'outil tiers Dive. ([src.](https://github.com/wagoodman/dive)) Il ne s'agit pas encore tout à fait d'un réel conteneur distroless. Un vrai travail de conteneurisation sans distro a été entamé, cf. fichier `Dockerfile-mongo-6.0-distroless` utilisant des dépendances tierces ([src.](https://github.com/tran4774/mongodb-distroless/blob/main/Dockerfile), [src.](https://github.com/tran4774/Resolving-Shared-Library/tree/master), [src.](https://github.com/Nerdmind/Snippets/blob/master/Bash/ldd-copy-dependencies.sh)). Cette initiative n'a toutefois pas été achevée.
+
+Ces commandes de construction ne sont plus nécessaires vu que nous avons adapté la recette Docker Compose en conséquence, de façon à reconstruire le conteneur automatiquement.
+
+Redéployez l'instance en utilisant la nouvelle recette :
+```
+docker compose -f docker-compose-prod-6.2.2-mongodb-6.0.6.yml down
+docker compose -f docker-compose-prod-6.2.2-mongodb-6.0-patched.yml up -d
+```
+
 
 ## Versions prises en charge
 
