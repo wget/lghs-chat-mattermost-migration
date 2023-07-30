@@ -1730,6 +1730,11 @@ docker compose -f docker-compose-prod-6.2.2-mongodb-6.0.6.yml down
 docker compose -f docker-compose-prod-6.2.2-mongodb-6.0-patched.yml up -d
 ```
 
+## Changement de politique pour les notifications push
+
+Autrefois, les ntifications Push étaient limitées à la version Entreprise. Depuis la version 6 de Rocket, ces dernières sont disponibles peu importe l'Edition de Rocket.Chat installée.
+
+La version Community est toutefois limitée à 10 000 notifications push par mois. ([src.](https://docs.rocket.chat/use-rocket.chat/workspace-administration/settings/push))
 
 ## Versions prises en charge
 
