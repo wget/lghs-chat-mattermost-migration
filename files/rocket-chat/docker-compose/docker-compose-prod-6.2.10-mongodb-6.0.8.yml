@@ -1,5 +1,7 @@
 version: "3.9"
 
+name: chatlghsbe
+
 services:
   rocketchat:
     image: registry.rocket.chat/rocketchat/rocket.chat:6.2.10
