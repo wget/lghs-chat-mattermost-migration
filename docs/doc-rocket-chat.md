@@ -1736,6 +1736,196 @@ Autrefois, les ntifications Push étaient limitées à la version Entreprise. De
 
 La version Community est toutefois limitée à 10 000 notifications push par mois. ([src.](https://docs.rocket.chat/use-rocket.chat/workspace-administration/settings/push))
 
+## Upgrade vers 6.3.1 - Custom build
+
+Rocket.Chat subissant, sans crier gare, une nouvelle régression avec OAuth, et suite à la nécessité d'appliquer plusieurs patches de sécurité impactant l'écosystème nodejs, nous avons été forcés de migrer dans l'urgence vers la branche 6.3 de Rocket. Cependant, le patch OAuth n'est disponible qu'en version 6.3.1 qui n'était alors pas disponible ni en version Docker, ni en version compilée. Nous avons alors dû prendre notre courage à 2 mains et étudier la procédure de packetage de Rocket (non documentée).
+
+En premier lieu, il nous a fallu une machine DEV1-XL chez Scaleway (12 Gio de RAM) avec l'ajout, de façon temporaire, d'une swap. Ces valeurs ont été obtenus suites à différents tests d'essai-erreur, jusqu'à obtenir une valeur qui passe.
+
+```
+fallocate -l 10G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+```
+
+([src.](https://www.digitalocean.com/community/tutorials/how-to-add-swap-space-on-debian-11))
+
+Meteor ne peut pas être buildé en root, même avec le flag d'autorisation root, car ça crée des soucis lors du packaging. Il faut donc créer un utilisateur avec Bash comme shell et avec un home fonctionnel.
+
+```
+# useradd -m -d /home/wget --shell /bin/bash wget
+```
+
+Switchez sur l'utilisateur créé :
+```
+# su wget -
+```
+
+Vérifiez que votre `/home/wget/` existe et que les variables telles que `$HOME` sont définies :
+```
+$ echo $HOME
+/home/wget
+```
+
+Installez volta pour avoir un environnement nodejs spécifique ([src.](https://docs.volta.sh/guide/getting-started)):
+```
+$ curl https://get.volta.sh | bash
+$ VOLTA_HOME=$HOME/.volta
+$ PATH=$VOLTA_HOME/bin:$PATH
+```
+
+Installez NodeJS 14 ([src.](https://docs.volta.sh/guide/understanding#managing-your-toolchain)):
+```
+volta install node@14
+```
+
+Installez meteor:
+```
+curl https://install.meteor.com/ | sh
+```
+
+Vérifiez que tous les outils sont dispos ([src.](https://developer.rocket.chat/open-source-projects/server/server-environment-setup/linux)):
+```
+meteor node -v
+meteor npm -v
+```
+
+
+```
+apt install g++ make
+```
+
+Téléchargez le tar gz de cette adresse ([src.](https://github.com/RocketChat/Rocket.Chat/releases/tag/6.3.1)) du GitHub:
+```
+mkdir -p /src/rc-build
+cd /srv/rc-build
+curl -LOC - https://github.com/RocketChat/Rocket.Chat/archive/refs/tags/6.3.1.tar.gz
+tar -xvf 6.3.1.tar.gz
+cd Rocket.Chat-6.3.1/
+```
+
+Compilez le projet :
+```
+cd apps/meteor
+meteor --version
+cd ../../
+yarn
+```
+
+Lancez le packaging :
+```
+yarn build:ci -- --directory ./dist
+cd apps/meteor/dist
+tar czf rocket.chat-6.3.1.tar.gz bundle
+```
+
+Prenez maintenant le Dockerfile de la 6.3 qu'on va patcher pour qu'il construise l'image Docker en utilisant notre propre build ([src.](https://github.com/RocketChat/Docker.Official.Image/blob/master/6.3/Dockerfile)):
+```
+curl -LOC - https://raw.githubusercontent.com/RocketChat/Docker.Official.Image/master/6.3/Dockerfile
+```
+
+Patchez le fichier comme tel :
+```
+--- Dockerfile  2023-08-11 18:51:30.598240562 +0000
++++ Dockerfile-new      2023-08-11 13:12:20.855522538 +0000
+@@ -1,5 +1,6 @@
+ FROM debian:buster-slim
+
++
+ ## Installing Node.js
+ ENV NODE_ENV production
+ ENV NODE_VERSION 14.21.3
+@@ -46,6 +47,8 @@
+   && mkdir -p /app/uploads \
+   && chown rocketchat:rocketchat /app/uploads
+
++COPY rocket.chat-6.3.1.tar.gz /app/
++
+ VOLUME /app/uploads
+
+ ENV RC_VERSION 6.3.0
+@@ -59,12 +62,13 @@
+   && apt-get install -y --no-install-recommends g++ make python ca-certificates curl gnupg \
+   && rm -rf /var/lib/apt/lists/* \
+   # gpg: key 4FD08104: public key "Rocket.Chat Buildmaster <buildmaster@rocket.chat>" imported
+-  && gpg --batch --keyserver keyserver.ubuntu.com --recv-keys 0E163286C20D07B9787EBE9FD7F9D0414FD08104 \
+-  && curl -fSL "https://releases.rocket.chat/${RC_VERSION}/download" -o rocket.chat.tgz \
+-  && curl -fSL "https://releases.rocket.chat/${RC_VERSION}/asc" -o rocket.chat.tgz.asc \
+-  && gpg --batch --verify rocket.chat.tgz.asc rocket.chat.tgz \
++  #&& gpg --batch --keyserver keyserver.ubuntu.com --recv-keys 0E163286C20D07B9787EBE9FD7F9D0414FD08104 \
++  #&& curl -fSL "https://releases.rocket.chat/${RC_VERSION}/download" -o rocket.chat.tgz \
++  && mv rocket.chat-6.3.1.tar.gz rocket.chat.tgz \
++  #&& curl -fSL "https://releases.rocket.chat/${RC_VERSION}/asc" -o rocket.chat.tgz.asc \
++  #&& gpg --batch --verify rocket.chat.tgz.asc rocket.chat.tgz \
+   && tar zxf rocket.chat.tgz \
+-  && rm rocket.chat.tgz rocket.chat.tgz.asc \
++  #&& rm rocket.chat.tgz rocket.chat.tgz.asc \
+   && cd bundle/programs/server \
+   && npm install \
+   && apt-mark auto '.*' > /dev/null \
+```
+
+Repassez en root et construisez l'image Docker en la taggant correctement:
+```
+# docker buildx build -t lghs-custom-rocket-chat-6.3.1 -f Dockerfile .
+```
+
+Ici, nous la tagguons en `lghs-custom-rocket-chat-6.3.1`, de façon à avoir un nom d'image assez unique.
+
+Exportez l'image en tant que fichier:
+```
+# docker save -o lghs-custom-rocket-chat-6.3.1.tar lghs-custom-rocket-chat-6.3.1
+```
+
+Copiez le fichier de la machine de build (`lghs-chat-test`) vers la prod (`lghs-chat-prod`). Pour éviter que l'image ne transite par notre machine, nous avons lancé un agent ssh sur `lghs-chat-test` et avons forwardé notre clé à partir de notre machine actuelle. De cette façon, `lghs-chat-test` a été en mesure de se connecter directement sur `lghs-chat-prod` sans que notre clé SSH soit envoyée sur `lghs-chat-test`.
+
+Sur `lghs-chat-test`:
+```
+eval $(ssh-agent)
+```
+
+Sur notre machine (sous réserve d'avoir préalablement configuré `lghs-chat-test` et `lghs-chat-prod` dans `~/.ssh/config`):
+```
+eval $(ssh-agent)
+ssh-add /chemin/vers/notre/cle/ssh/john_doe_lghs_ed25519
+scp -A lghs-chat-test:/srv/rc-build/Rocket.Chat-6.3.1/apps/meteor/dist/lghs-custom-rocket-chat-6.3.1.tar lghs-chat-prod:/srv/chat.lghs.be/deploy/docker-compose/
+```
+
+Sur `lghs-chat-prod`, importez l'image Docker transférée :
+```
+# cd /srv/chat.lghs.be/deploy/docker-compose
+# docker load -i lghs-custom-rocket-chat-6.3.1.tar
+```
+
+Toujours sur `lghs-chat-prod`, changez la recette Docker Compose pour pointer vers l'image que vous venez d'importer, saivez la modification sous (par exemple) `docker-compose-prod-6.3.1-mongodb-6.0.8.yml` :
+```
+--- docker-compose-prod-6.3.0-mongodb-6.0.8.yml 2023-08-07 20:49:01.716567820 +0000
++++ docker-compose-prod-6.3.1-mongodb-6.0.8.yml 2023-08-11 13:27:34.993430788 +0000
+@@ -4,7 +4,8 @@
+
+ services:
+   rocketchat:
+-    image: registry.rocket.chat/rocketchat/rocket.chat:6.3.0
++    #image: registry.rocket.chat/rocketchat/rocket.chat:6.3.1
++    image: lghs-custom-rocket-chat-6.3.1:latest
+     command: >
+       bash -c
+         "for i in `seq 1 30`; do
+```
+
+Stoppez la version de Rocket.Chat en cours d'exécution :
+```
+# docker compose -f docker-compose-prod-6.3.0-mongodb-6.0.8.yml down
+```
+
+Lancez la nouvelle version 6.3.1 personnalisée qui vient d'être importée :
+```
+# docker compose -f docker-compose-prod-6.3.1-mongodb-6.0.8.yml up -d
+```
+
+
+
 ## Versions prises en charge
 
 https://docs.rocket.chat/getting-support/enterprise-support
