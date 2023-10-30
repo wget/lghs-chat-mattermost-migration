@@ -4,7 +4,7 @@ name: chatlghsbe
 
 services:
   rocketchat:
-    image: rocketchat/rocket.chat:6.2.8
+    image: registry.rocket.chat/rocketchat/rocket.chat:6.3.0
     command: >
       bash -c
         "for i in `seq 1 30`; do
@@ -27,7 +27,7 @@ services:
       - 3000:3000
 
   mongo:
-    image: mongo:6.0.6
+    image: mongo:6.0.8
     restart: unless-stopped
     volumes:
      - "/srv/chat.lghs.be/data/db:/data/db/"
@@ -37,7 +37,7 @@ services:
   # this container's job is just run the command to initialize the replica set.
   # it will run the command and remove himself (it will not stay running)
   mongo-init-replica:
-    image: mongo:6.0.6
+    image: mongo:6.0.8
     command: >
       bash -c
         "for i in `seq 1 30`; do

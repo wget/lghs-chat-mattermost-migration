@@ -1924,6 +1924,97 @@ Lancez la nouvelle version 6.3.1 personnalisée qui vient d'être importée :
 # docker compose -f docker-compose-prod-6.3.1-mongodb-6.0.8.yml up -d
 ```
 
+## Upgrade vers 6.3.10
+
+De nouveaux correctifs de sécurité étant disponibles, nous sommes obligés de nous mettre à jour. Cependant, la branche 6.4 subit de nouvelles régressions OAuth ([src.](https://github.com/RocketChat/Rocket.Chat/pull/30750)), de sorte qu'il n'est pas possible d'y passer directement, nous limitant à la dernière de la branche 6.3 pour le moment.
+
+Stoppez la stack actuellement en cours :
+```
+# docker compose -f docker-compose-prod-6.3.1-mongodb-6.0.8.yml down
+```
+
+Copiez le fichier `docker-compose-prod-6.3.1-mongodb-6.0.8.yml` sous le nouveau nom `docker-compose-prod-6.3.10-mongodb-6.0.11.yml` et modifiez le comme tel de façon à repasser sur les images officielles (plus besoin de builds personnalisées pour l'instant) :
+```
+--- docker-compose-prod-6.3.1-mongodb-6.0.8.yml 2023-08-11 13:27:34.993430788 +0000
++++ docker-compose-prod-6.3.10-mongodb-6.0.11.yml       2023-10-30 09:49:54.026467999 +0000
+@@ -4,8 +4,8 @@
+
+ services:
+   rocketchat:
+-    #image: registry.rocket.chat/rocketchat/rocket.chat:6.3.1
+-    image: lghs-custom-rocket-chat-6.3.1:latest
++    image: registry.rocket.chat/rocketchat/rocket.chat:6.3.10
++    #image: lghs-custom-rocket-chat-6.3.1:latest
+     command: >
+       bash -c
+         "for i in `seq 1 30`; do
+@@ -28,7 +28,7 @@
+       - 3000:3000
+
+   mongo:
+-    image: mongo:6.0.8
++    image: mongo:6.0.11
+     restart: unless-stopped
+     volumes:
+      - "/srv/chat.lghs.be/data/db:/data/db/"
+```
+
+Lancez la recette :
+```
+# docker compose -f docker-compose-prod-6.3.10-mongodb-6.0.11.yml up -d
+```
+
+Au prochain redémarrage du serveur, vous allez avoir un warning sur la console du conteneur Docker ([src.](https://github.com/RocketChat/Rocket.Chat/issues/29614)) :
+```
+Some indexes for collection 'rocketchat_uploads' could not be created:
+        An existing index has the same name as the requested index. When index names are not specified, they are auto generated and can cause conflicts. Please refer to our documentation. Requested index: { v: 2, key: { rid: 1 }, name: "rid_1", sparse: true }, existing index: { v: 2, key: { rid: 1 }, name: "rid_1" }
+```
+
+Pour corriger ce problème, supprimez les index avec la commande `db.rocketchat_uploads.dropIndexes()` à appliquer comme tel :
+```
+root@lghs-chat-prod:/srv/chat.lghs.be# docker exec -it chatlghsbe-mongo-1 /bin/bash
+root@1b8f5e957cbe:/# mongosh
+Current Mongosh Log ID: 653f89d084ecf167169ba983
+Connecting to:          mongodb://127.0.0.1:27017/?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.0.1
+Using MongoDB:          6.0.11
+Using Mongosh:          2.0.1
+
+For mongosh info see: https://docs.mongodb.com/mongodb-shell/
+
+------
+   The server generated these startup warnings when booting
+   2023-10-30T09:55:29.073+00:00: Using the XFS filesystem is strongly recommended with the WiredTiger storage engine. See http://dochub.mongodb.org/core/prodnotes-filesystem
+   2023-10-30T09:55:30.987+00:00: Access control is not enabled for the database. Read and write access to data and configuration is unrestricted
+   2023-10-30T09:55:30.988+00:00: /sys/kernel/mm/transparent_hugepage/enabled is 'always'. We suggest setting it to 'never'
+   2023-10-30T09:55:30.988+00:00: vm.max_map_count is too low
+------
+
+rs0 [direct: primary] test> use rocketchat
+switched to db rocketchat
+rs0 [direct: primary] rocketchat> db.rocketchat_uploads.dropIndexes()
+{
+  nIndexesWas: 7,
+  msg: 'non-_id indexes dropped for collection',
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1698662880, i: 10 }),
+    signature: {
+      hash: Binary.createFromBase64("AAAAAAAAAAAAAAAAAAAAAAAAAAA=", 0),
+      keyId: Long("0")
+    }
+  },
+  operationTime: Timestamp({ t: 1698662880, i: 10 })
+}
+rs0 [direct: primary] rocketchat> exit
+root@1b8f5e957cbe:/# exit
+exit
+```
+
+Arrêtez et relancez la recette :
+```
+# docker compose -f docker-compose-prod-6.3.10-mongodb-6.0.11.yml down
+# docker compose -f docker-compose-prod-6.3.10-mongodb-6.0.11.yml up -d
+```
 
 
 ## Versions prises en charge
